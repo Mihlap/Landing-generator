@@ -1,0 +1,51 @@
+# Зависимости
+node_modules/
+
+# Сборка
+dist/
+build/
+client/dist/
+server/dist/
+*.tsbuildinfo
+
+# Окружение и секреты
+.env
+.env.*
+!.env.example
+
+# Логи и отладка
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ОС
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / редакторы
+.idea/
+*.swp
+*.swo
+*~
+
+# Кэш инструментов
+.cache/
+.parcel-cache/
+.turbo/
+.vite/
+*.local
+.env.example
+.env
+
+# Тесты и покрытие
+coverage/
+.nyc_output/
+
+# Временные файлы
+tmp/
+temp/
+*.tmp
