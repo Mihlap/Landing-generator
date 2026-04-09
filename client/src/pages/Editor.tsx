@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { postPreviewHtml } from "../api/generate";
-import { LOCATION_FROM_EDITOR, touchEditorPromoAnchor } from "../components/LabaPromo";
+import { touchEditorPromoAnchor } from "../components/LabaPromo";
+import { LOCATION_FROM_EDITOR } from "../constants/navigation";
 import type { LandingData } from "../types";
 
 function normalizeData(raw: LandingData | undefined): LandingData | undefined {
@@ -24,9 +25,8 @@ export default function Editor() {
   const [draftHtml, setDraftHtml] = useState<string>("");
   const [editing, setEditing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(true);  
-  const [previewFrameKey, setPreviewFrameKey] = useState(0);
-  const wasEditingRef = useRef(false);
+  const [previewLoading, setPreviewLoading] = useState(true);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const loadPreview = useCallback(async () => {
     if (!data) return;
@@ -53,13 +53,6 @@ export default function Editor() {
     touchEditorPromoAnchor();
   }, []);
 
-  useEffect(() => {
-    if (wasEditingRef.current && !editing) {
-      setPreviewFrameKey((k) => k + 1);
-    }
-    wasEditingRef.current = editing;
-  }, [editing]);
-
   if (!data) return null;
 
   const previewHtml = draftHtml || html;
@@ -69,7 +62,11 @@ export default function Editor() {
       setPreviewLoading(false);
       return;
     }
-    setPreviewLoading(Boolean(previewHtml));
+    if (!previewHtml) {
+      setPreviewLoading(false);
+      return;
+    }
+    setPreviewLoading(true);
   }, [editing, previewHtml]);
 
   function downloadHtml() {
@@ -85,8 +82,8 @@ export default function Editor() {
   }
 
   function handlePreviewLoad() {
-    /** Не ждём все картинки — иначе оверлей висит до таймаута; контент в iframe дорисовывается сам. */
-    requestAnimationFrame(() => setPreviewLoading(false));
+    // Даем iframe отрисовать первый кадр и сразу снимаем оверлей.
+    window.setTimeout(() => setPreviewLoading(false), 250);
   }
 
   return (
@@ -151,7 +148,7 @@ export default function Editor() {
               </div>
             ) : null}
             <iframe
-              key={previewFrameKey}
+              ref={iframeRef}
               onLoad={handlePreviewLoad}
               title="Предпросмотр лендинга"
               className="w-full min-h-[calc(100vh-4rem)] border-0"

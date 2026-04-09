@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import exportRouter from "./routes/export.js";
 import generateRouter from "./routes/generate.js";
+import imageRouter from "./routes/image.js";
 import paymentRouter from "./routes/payment.js";
 import previewRouter from "./routes/preview.js";
 
@@ -17,6 +18,7 @@ export function createApp() {
   app.use("/generate", generateRouter);
   app.use("/export", exportRouter);
   app.use("/preview", previewRouter);
+  app.use("/image", imageRouter);
   app.use("/payments", paymentRouter);
 
   return app;

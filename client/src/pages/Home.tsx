@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { postGenerate } from "../api/generate";
 import type { SiteLocale } from "../types";
@@ -14,7 +14,7 @@ const benefits = [
   "Предпросмотр, редактирование и выгрузка HTML",
 ] as const;
 
-function IconExpand({ className }: { className?: string }) {
+const IconExpand = memo(function IconExpand({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -31,9 +31,9 @@ function IconExpand({ className }: { className?: string }) {
       <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
     </svg>
   );
-}
+});
 
-function IconCollapse({ className }: { className?: string }) {
+const IconCollapse = memo(function IconCollapse({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -50,7 +50,7 @@ function IconCollapse({ className }: { className?: string }) {
       <path d="M4 14h6v6M14 4h6v6M20 4l-5 5M4 20l5-5" />
     </svg>
   );
-}
+});
 
 const textareaClassName =
   "w-full rounded-xl border border-slate-700/90 bg-slate-900/55 px-3 py-3 text-[0.9375rem] leading-relaxed text-slate-100 placeholder:text-slate-600 focus:border-indigo-500/45 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
@@ -63,10 +63,26 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
 
+  const closeExpandedPrompt = useCallback(() => setPromptExpanded(false), []);
+  const openExpandedPrompt = useCallback(() => setPromptExpanded(true), []);
+  const setLocaleRu = useCallback(() => setSiteLocale("ru"), []);
+  const setLocaleEn = useCallback(() => setSiteLocale("en"), []);
+  const onPromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setPrompt(e.target.value);
+  }, []);
+
+  const localeIndicatorStyle = useMemo(
+    () => ({
+      width: "calc(50% - 0.375rem)",
+      transform: siteLocale === "en" ? "translateX(calc(100% + 0.25rem))" : "translateX(0)",
+    }),
+    [siteLocale],
+  );
+
   useEffect(() => {
     if (!promptExpanded) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPromptExpanded(false);
+      if (e.key === "Escape") closeExpandedPrompt();
     };
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -75,7 +91,7 @@ export default function Home() {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [promptExpanded]);
+  }, [closeExpandedPrompt, promptExpanded]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,7 +135,7 @@ export default function Home() {
             </h2>
             <button
               type="button"
-              onClick={() => setPromptExpanded(false)}
+              onClick={closeExpandedPrompt}
               className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-xs font-medium text-slate-300 touch-action-manipulation hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/45"
             >
               <IconCollapse className="text-slate-400" />
@@ -132,7 +148,7 @@ export default function Home() {
             className={`mt-3 min-h-0 flex-1 resize-none ${textareaClassName}`}
             placeholder={descriptionHint[siteLocale]}
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={onPromptChange}
             required
             aria-label="Описание сайта"
           />
@@ -201,17 +217,11 @@ export default function Home() {
                       <span
                         aria-hidden
                         className="pointer-events-none absolute top-1 bottom-1 left-1 z-0 rounded-lg bg-slate-800 shadow-md ring-1 ring-white/[0.06] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none"
-                        style={{
-                          width: "calc(50% - 0.375rem)",
-                          transform:
-                            siteLocale === "en"
-                              ? "translateX(calc(100% + 0.25rem))"
-                              : "translateX(0)",
-                        }}
+                        style={localeIndicatorStyle}
                       />
                       <button
                         type="button"
-                        onClick={() => setSiteLocale("ru")}
+                        onClick={setLocaleRu}
                         className={`relative z-10 flex min-h-0 w-full items-center justify-center self-stretch rounded-lg px-2 text-sm font-medium leading-none transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/45 touch-action-manipulation ${
                           siteLocale === "ru" ? "text-white" : "text-slate-400 hover:text-slate-300"
                         }`}
@@ -220,7 +230,7 @@ export default function Home() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSiteLocale("en")}
+                        onClick={setLocaleEn}
                         className={`relative z-10 flex min-h-0 w-full items-center justify-center self-stretch rounded-lg px-2 text-sm font-medium leading-none transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/45 touch-action-manipulation ${
                           siteLocale === "en" ? "text-white" : "text-slate-400 hover:text-slate-300"
                         }`}
@@ -237,7 +247,7 @@ export default function Home() {
                       </label>
                       <button
                         type="button"
-                        onClick={() => setPromptExpanded(true)}
+                        onClick={openExpandedPrompt}
                         className="inline-flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center rounded-md border border-slate-600/90 p-1 text-slate-400 touch-action-manipulation hover:bg-slate-800 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/45"
                         aria-label="Развернуть поле ввода на весь экран"
                         title="На весь экран"
@@ -252,7 +262,7 @@ export default function Home() {
                         className={`min-h-[11rem] max-h-[min(42dvh,17rem)] resize-y sm:min-h-[12rem] sm:max-h-[min(45dvh,19rem)] ${textareaClassName}`}
                         placeholder={descriptionHint[siteLocale]}
                         value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
+                        onChange={onPromptChange}
                         required
                       />
                     ) : null}

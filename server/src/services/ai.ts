@@ -70,6 +70,21 @@ export function defaultSkinForTemplate(templateId: TemplateId): SkinId {
   return map[templateId];
 }
 
+function formatUnknownError(e: unknown): string {
+  if (e instanceof Error && typeof e.message === "string" && e.message.trim()) {
+    return e.message;
+  }
+  if (typeof e === "string" && e.trim()) return e;
+  if (e && typeof e === "object") {
+    try {
+      const json = JSON.stringify(e);
+      if (json && json !== "{}") return json;
+    } catch {
+    }
+  }
+  return String(e);
+}
+
 export type LandingData = {
   title: string;
   subtitle: string;
@@ -413,7 +428,7 @@ ${prompt}
   try {
     text = await runLlmCompletion(provider, system, userMessage);
   } catch (e) {
-    const errText = e instanceof Error ? e.message : String(e);
+    const errText = formatUnknownError(e);
 
     if (provider === "zai" && hasGigachatFallback()) {
       return generateLandingFromTemplateJson(prompt, locale, "gigachat");

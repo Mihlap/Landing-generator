@@ -4,6 +4,7 @@ const LEAD_FORM_MARKER = "data-landing-lead-form-fix";
 const CONTACT_MARKER = "data-landing-contact-fix";
 const CONTRAST_MARKER = "data-landing-contrast-fix";
 const LEAD_ALIGN_MARKER = "data-landing-lead-align-fix";
+const IMAGE_RETRY_MARKER = "data-landing-image-retry-fix";
 const LAYOUT_MARKER = "data-landing-layout-fix";
 const STRUCTURE_MARKER = "data-landing-structure-fix";
 
@@ -80,8 +81,7 @@ const ANCHOR_SCRIPT = `<script ${ANCHOR_MARKER}="1">
         e.preventDefault();
         target.scrollIntoView({behavior:"smooth",block:"start"});
         return;
-      }
-      // Блокируем переход в SPA-хост по относительным ссылкам вида "/" или "about".
+      }    
       e.preventDefault();
       return;
     }
@@ -244,6 +244,57 @@ const LEAD_ALIGN_SCRIPT = `<script ${LEAD_ALIGN_MARKER}="1">
 })();
 </script>`;
 
+const IMAGE_RETRY_SCRIPT = `<script ${IMAGE_RETRY_MARKER}="1">
+(function(){
+  var RETRIES = 10;
+  var RETRY_DELAYS_MS = [2000, 3500, 5500, 8000, 11000];
+  function isRetryableSrc(src){
+    return /^\\/image\\?/i.test(String(src||""));
+  }
+  function withRetryParam(src, attempt){
+    var sep = src.indexOf("?") >= 0 ? "&" : "?";
+    return src + sep + "retry=" + attempt + "-" + Date.now();
+  }
+  function schedule(img){
+    if(!(img instanceof HTMLImageElement)) return;
+    var baseSrc = img.getAttribute("src") || "";
+    if(!isRetryableSrc(baseSrc)) return;
+    if(img.dataset.retryScheduled === "1") return;
+    img.dataset.retryScheduled = "1";
+    var loadedOk = false;
+    if (img.complete && (img.naturalWidth || 0) > 0) {
+      loadedOk = true;
+    }
+    function markLoaded(){
+      loadedOk = true;
+    }
+    img.addEventListener("load", markLoaded, { once: true });
+    var attempt = 0;
+    function tick(){
+      if(loadedOk) return;
+      if(attempt >= RETRIES) return;
+      attempt += 1;
+      img.src = withRetryParam(baseSrc, attempt);
+      if (attempt < RETRIES) {
+        window.setTimeout(function(){
+          if (!loadedOk) tick();
+        }, RETRY_DELAYS_MS[attempt - 1] || 8000);
+      }
+    }
+    window.setTimeout(function(){
+      if (!loadedOk) tick();
+    }, RETRY_DELAYS_MS[0] || 2000);
+  }
+  function init(){
+    document.querySelectorAll("img[src]").forEach(function(node){
+      schedule(node);
+    });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>`;
+
 const FOOTER_STYLE = `<style ${FOOTER_MARKER}="1">
 html, body { min-height: 100%; max-width: 100%; overflow-x: hidden; }
 body { min-height: 100vh; display: flex; flex-direction: column; width: 100%; }
@@ -290,7 +341,18 @@ footer {
   margin-right: auto !important;
   box-sizing: border-box;
 }
-section { padding-top: clamp(1.25rem, 3vw, 2rem); padding-bottom: clamp(1.25rem, 3vw, 2rem); }
+section {
+  padding-top: clamp(1.25rem, 3vw, 2rem);
+  padding-bottom: clamp(1.25rem, 3vw, 2rem);
+  padding-left: clamp(1rem, 3vw, 1.5rem);
+  padding-right: clamp(1rem, 3vw, 1.5rem);
+}
+/* Когда модель делает HERO flex-рядом-с-картинкой, текстовый контейнер часто "прилипает" к краю. */
+[data-landing-title-fix="1"] > div:first-child,
+section[class*="hero" i] > div:first-child {
+  padding-left: clamp(.5rem, 2vw, 1.25rem);
+  padding-right: clamp(.5rem, 2vw, 1.25rem);
+}
 section ul:not(nav ul):not(header ul) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -303,8 +365,95 @@ section .cards, section .grid, section .services, section .reviews, section .ben
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 1rem;
 }
-section .card:not(:has(.content)) {
+/* Универсальный фикс: генератор часто делает .*-list без gap, и карточки "слипаются". */
+section [class*="list"],
+section [class*="cards"],
+section [class*="grid"],
+section [class*="container"] {
+  display: grid;
+  gap: clamp(.85rem, 2vw, 1.25rem);
+}
+section [class*="list"] > *,
+section [class*="cards"] > *,
+section [class*="grid"] > *,
+section [class*="container"] > * {
+  margin: 0;
+}
+section > :not(style):not(script) + :not(style):not(script) {
+  margin-top: clamp(.85rem, 2vw, 1.25rem);
+}
+section > div:has(> img + img),
+section > div:has(> figure + figure),
+section > div:has(> .card + .card),
+section > div:has(> [class*="card"] + [class*="card"]) {
+  display: grid;
+  gap: clamp(.85rem, 2vw, 1.25rem);
+}
+section .review,
+section .review-card,
+section .benefit-card,
+section .product-card,
+section .service-card,
+section .faq-item {
+  margin: 0;
+}
+section .review-card + .review-card,
+section .card + .card,
+section [class*="card"] + [class*="card"] {
+  margin-top: clamp(.85rem, 2vw, 1.25rem);
+}
+footer form,
+section[id*="footer" i] form,
+section[class*="footer" i] form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem;
+}
+footer form > *,
+section[id*="footer" i] form > *,
+section[class*="footer" i] form > * {
+  margin: 0 !important;
+}
+footer form input + button,
+footer form textarea + button,
+footer form select + button,
+section[id*="footer" i] form input + button,
+section[id*="footer" i] form textarea + button,
+section[id*="footer" i] form select + button,
+section[class*="footer" i] form input + button,
+section[class*="footer" i] form textarea + button,
+section[class*="footer" i] form select + button {
+  margin-left: .75rem !important;
+}
+@media (max-width: 640px) {
+  footer form input + button,
+  footer form textarea + button,
+  footer form select + button,
+  section[id*="footer" i] form input + button,
+  section[id*="footer" i] form textarea + button,
+  section[id*="footer" i] form select + button,
+  section[class*="footer" i] form input + button,
+  section[class*="footer" i] form textarea + button,
+  section[class*="footer" i] form select + button {
+    margin-left: 0 !important;
+    margin-top: .75rem !important;
+  }
+}
+section .card:not(:has(.content)),
+section [class*="card"]:not(:has(.content)):not(:has(> img:only-child)),
+section .review:not(:has(.content)) {
   padding: clamp(1rem, 2.5vw, 1.35rem);
+  box-sizing: border-box;
+}
+section .service-card,
+section .review-card,
+section .benefit-card,
+section .product-card,
+section .grid-item,
+section .faq-item,
+section .review {
+  padding: clamp(1rem, 2.5vw, 1.35rem) !important;
   box-sizing: border-box;
 }
 img { display: block; max-width: 100%; height: auto; border-radius: 12px; }
@@ -561,10 +710,14 @@ function ensureImageTagsHaveSource(html: string): string {
     const srcValue = srcMatch?.[2]?.trim() ?? "";
     const dataSrcValue = dataSrcMatch?.[2]?.trim() ?? "";
     const preferred = srcValue || dataSrcValue;
-    if (!/^(https?:\/\/|data:image\/)/i.test(preferred)) {     
+    if (!/^(https?:\/\/|data:image\/)/i.test(preferred)) {
       return "";
     }
-    const resolvedSrc = preferred;
+    let resolvedSrc = preferred;
+  
+    if (/^data:image\//i.test(resolvedSrc) && resolvedSrc.length > 2048) {
+      resolvedSrc = FALLBACK_IMAGE_SRC;
+    }
 
     let updated = tag;
     if (srcMatch) {
@@ -596,6 +749,14 @@ function ensureImageTagsHaveSource(html: string): string {
 
 function ensureBackgroundImagesHaveSource(html: string): string {
   return html.replace(/background-image\s*:\s*url\((["']?)\s*\1\)\s*;?/gi, "background-image:none;");
+}
+
+function sanitizeInlineCssDataUrls(html: string): string {
+  return html
+    .replace(/cursor\s*:[^;{}]*data:image[\s\S]*?(?:;|(?=\}))/gi, "cursor:auto;")  
+    .replace(/url\((["']?)\s*data:[\s\S]*?\1\)/gi, "none") 
+    .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\s]+/gi, INLINE_IMAGE_FALLBACK)
+    .replace(/cursor\s*:\s*none\s*;?/gi, "cursor:auto;");
 }
 
 function ensureContactSectionAnchors(html: string): string {
@@ -657,15 +818,60 @@ function ensureLeadForm(html: string): string {
   return html;
 }
 
+function toLocalImageUrl(prompt: string, size: { width: number; height: number }): string {
+  const encoded = encodeURIComponent(prompt.trim().slice(0, 600));
+  const width = Math.max(256, Math.min(2048, Math.round(size.width)));
+  const height = Math.max(256, Math.min(2048, Math.round(size.height)));
+  return `/image?prompt=${encoded}&w=${width}&h=${height}`;
+}
+
+function replaceStockImagesWithAi(html: string): string {
+  const title =
+    /<title[^>]*>([^<]{1,160})<\/title>/i.exec(html)?.[1]?.trim() ||
+    /<h1[^>]*>([^<]{1,160})<\/h1>/i.exec(html)?.[1]?.trim() ||
+    "";
+
+  const heroSize = { width: 1280, height: 720 };
+  const cardSize = { width: 1024, height: 768 };
+
+  return html.replace(/<img\b[^>]*>/gi, (tag) => {
+    const srcMatch = /\ssrc\s*=\s*(["'])(.*?)\1/i.exec(tag);
+    const src = srcMatch?.[2]?.trim() ?? "";
+    if (!src) return tag;
+  
+    if (/^\/image\?/i.test(src)) return tag;
+    if (!/^(https?:\/\/)/i.test(src)) return tag;
+    if (!/(images\.unsplash\.com|images\.pexels\.com|image\.pollinations\.ai)/i.test(src)) return tag;
+
+    const altMatch = /\salt\s*=\s*(["'])(.*?)\1/i.exec(tag);
+    const alt = altMatch?.[2]?.trim() ?? "";
+
+    const isHero = /data-landing-title-fix\s*=\s*(["'])1\1/i.test(html) && /class\s*=\s*(["'])[^"']*\bhero\b/i.test(html)
+      ? /class\s*=\s*(["'])[^"']*\bhero\b[^"']*\1/i.test(html.slice(Math.max(0, html.indexOf(tag) - 400), html.indexOf(tag) + 400))
+      : /class\s*=\s*(["'])[^"']*\bhero\b/i.test(tag);
+
+    const basePrompt = alt || "Website section illustration";
+    const fullPrompt = title ? `${basePrompt}. ${title}.` : basePrompt;
+    const aiUrl = toLocalImageUrl(fullPrompt, isHero ? heroSize : cardSize);
+
+    if (srcMatch) {
+      return tag.replace(/\ssrc\s*=\s*(["'])(.*?)\1/i, ` src="${aiUrl}"`);
+    }
+    return tag.replace(/<img/i, `<img src="${aiUrl}"`);
+  });
+}
+
 export function enhanceLandingHtml(html: string, fallbackImageSrc: string = FALLBACK_IMAGE_SRC): string {
   const withLayoutWidths = normalizeLayoutWidths(html);
-  const withSafeBgImages = ensureBackgroundImagesHaveSource(withLayoutWidths);
+  const withSanitizedCssDataUrls = sanitizeInlineCssDataUrls(withLayoutWidths);
+  const withSafeBgImages = ensureBackgroundImagesHaveSource(withSanitizedCssDataUrls);
   const withSafeImages = ensureImageTagsHaveSource(withSafeBgImages);
   const withContactAnchors = ensureContactSectionAnchors(withSafeImages);
   const withImagePlaceholders = fillEmptyImagePlaceholders(withContactAnchors);
   const withHeroTitleFix = normalizeHeroHeadingSurface(withImagePlaceholders);
   const withHeroImage = ensureAtLeastOneHeroImage(withHeroTitleFix);
-  const withVisualCoverage = ensureVisualCoverage(withHeroImage);
+  const withAiImages = replaceStockImagesWithAi(withHeroImage);
+  const withVisualCoverage = ensureVisualCoverage(withAiImages);
   const withLeadForm = ensureLeadForm(withVisualCoverage);
   const normalizedLinks = rewriteInternalLinksToAnchors(withLeadForm);
   const trimmed = normalizedLinks.trim();
@@ -677,6 +883,7 @@ export function enhanceLandingHtml(html: string, fallbackImageSrc: string = FALL
     trimmed.includes(`${CONTACT_MARKER}="1"`) &&
     trimmed.includes(`${CONTRAST_MARKER}="1"`) &&
     trimmed.includes(`${LEAD_ALIGN_MARKER}="1"`) &&
+    trimmed.includes(`${IMAGE_RETRY_MARKER}="1"`) &&
     trimmed.includes(`${LAYOUT_MARKER}="1"`) &&
     trimmed.includes(`${STRUCTURE_MARKER}="1"`)
   ) {
@@ -692,6 +899,7 @@ export function enhanceLandingHtml(html: string, fallbackImageSrc: string = FALL
     !trimmed.includes(`${CONTACT_MARKER}="1"`) ? CONTACT_SCRIPT : "",
     !trimmed.includes(`${CONTRAST_MARKER}="1"`) ? CONTRAST_SCRIPT : "",
     !trimmed.includes(`${LEAD_ALIGN_MARKER}="1"`) ? LEAD_ALIGN_SCRIPT : "",
+    !trimmed.includes(`${IMAGE_RETRY_MARKER}="1"`) ? IMAGE_RETRY_SCRIPT : "",
   ]
     .filter(Boolean)
     .join("");

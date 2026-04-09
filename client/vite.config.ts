@@ -55,6 +55,7 @@ export default defineConfig(({ mode }) => {
         "/generate": { target: apiTarget, changeOrigin: true },
         "/export": { target: apiTarget, changeOrigin: true },
         "/preview": { target: apiTarget, changeOrigin: true },
+        "/image": { target: apiTarget, changeOrigin: true },
         "/health": { target: apiTarget, changeOrigin: true },
         "/payments": { target: apiTarget, changeOrigin: true },
       },

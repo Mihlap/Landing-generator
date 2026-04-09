@@ -49,3 +49,6 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Локальные инструкции
+DEPLOY.md

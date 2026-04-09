@@ -1,17 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const LABA_URL = "https://laba-laba.ru/";
 const STORAGE_EDITOR_ANCHOR = "laba-promo-editor-anchor";
 
 const DELAY_HOME_MS = 30 * 1000;
-const DELAY_EDITOR_MS = 2 * 60 * 1000;
+const DELAY_EDITOR_MS = 90 * 1000;
 
 const EDITOR_ANCHOR_EVENT = "laba-promo-editor-anchor";
 
 type BrowserTimerId = number;
 
-/** Сброс окна подсказки редактора: отсчёт 2 мин от якоря (вход на /editor или готовый предпросмотр). */
 export function touchEditorPromoAnchor(): void {
   try {
     sessionStorage.setItem(STORAGE_EDITOR_ANCHOR, String(Date.now()));
@@ -28,7 +27,7 @@ function isLabaHost(): boolean {
 
 type PromoVariant = "home" | "editor";
 
-function PromoInner({ onDismiss, variant }: { onDismiss: () => void; variant: PromoVariant }) {
+const PromoInner = memo(function PromoInner({ onDismiss, variant }: { onDismiss: () => void; variant: PromoVariant }) {
   const ed = variant === "editor";
   return (
     <div className="flex gap-3">
@@ -55,7 +54,7 @@ function PromoInner({ onDismiss, variant }: { onDismiss: () => void; variant: Pr
                 : "inline-flex items-center rounded-lg bg-indigo-500/20 px-2.5 py-1 text-sm font-semibold text-indigo-200 ring-1 ring-indigo-400/30 transition hover:bg-indigo-500/30 hover:text-white hover:ring-indigo-400/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
             }
           >
-            Laba
+            Перейти
           </a>
         </p>
       </div>
@@ -75,9 +74,7 @@ function PromoInner({ onDismiss, variant }: { onDismiss: () => void; variant: Pr
       </button>
     </div>
   );
-}
-
-export const LOCATION_FROM_EDITOR = { fromEditor: true as const };
+});
 
 export function LabaPromoHome() {
   const { pathname, state: locationState } = useLocation();
@@ -128,7 +125,7 @@ export function LabaPromoHome() {
       role="dialog"
       aria-label="Предложение студии Laba: помощь с сайтом"
     >
-      <div className="laba-promo-slide-bottom pointer-events-auto w-full max-w-lg rounded-xl border border-indigo-400/45 bg-slate-950 px-4 py-3 shadow-[0_-12px_48px_-8px_rgba(0,0,0,0.55),0_-8px_40px_-12px_rgba(79,70,229,0.35)] ring-1 ring-white/10 backdrop-blur-md sm:px-5 sm:py-4">
+      <div className="laba-promo-slide-bottom pointer-events-auto w-full max-w-lg rounded-xl border border-indigo-500/35 bg-slate-900/95 px-4 py-3 shadow-[0_-8px_40px_-12px_rgba(79,70,229,0.45)] backdrop-blur-md sm:px-5 sm:py-4">
         <PromoInner variant="home" onDismiss={dismiss} />
       </div>
     </div>
@@ -143,9 +140,9 @@ export function LabaPromoEditor() {
   const timerRef = useRef<BrowserTimerId | null>(null);
 
   useEffect(() => {
-    if (dismissed) return;
     if (pathname !== "/editor") {
       setVisible(false);
+      setDismissed(false);
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -154,6 +151,8 @@ export function LabaPromoEditor() {
     }
 
     function scheduleFromAnchor() {
+      // После каждой новой генерации (touchEditorPromoAnchor) снова показываем подсказку через задержку.
+      setDismissed(false);
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -187,18 +186,22 @@ export function LabaPromoEditor() {
       window.removeEventListener(EDITOR_ANCHOR_EVENT, scheduleFromAnchor);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [pathname, dismissed]);
+  }, [pathname]);
 
   if (dismissed || !visible || pathname !== "/editor") return null;
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex min-h-0 min-w-0 items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex min-h-0 min-w-0 items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Предложение студии Laba: помощь с сайтом"
     >
-      <div className="laba-promo-enter-center w-full max-w-lg rounded-2xl bg-zinc-950/97 px-4 py-4 shadow-[0_28px_72px_-20px_rgba(0,0,0,0.62),0_48px_120px_-48px_rgba(20,184,166,0.22),0_0_80px_-24px_rgba(45,212,191,0.12)] sm:px-6 sm:py-5">
+      <div className="laba-promo-enter-center relative w-full max-w-lg overflow-hidden rounded-2xl border border-teal-200/35 bg-zinc-950/100 px-4 py-4 shadow-[0_34px_84px_-18px_rgba(0,0,0,0.82),0_48px_120px_-48px_rgba(20,184,166,0.32),0_0_90px_-24px_rgba(45,212,191,0.22)] ring-2 ring-white/10 sm:px-6 sm:py-5">
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-teal-300 via-teal-400 to-cyan-500"
+          aria-hidden
+        />
         <PromoInner variant="editor" onDismiss={dismiss} />
       </div>
     </div>

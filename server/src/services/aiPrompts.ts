@@ -191,6 +191,11 @@ PRODUCTS:
 
 REVIEWS:
 - карточки с фоном
+- отзывы не "сухие":
+  - 1 конкретная деталь ("за 3 недели", "после 5 занятий", "рост заявок на 27%")
+  - эмоциональная формулировка живым языком
+  - короткая подпись (имя + роль/город)
+  - без шаблонов типа "всё понравилось", "рекомендую всем" без фактов
 
 CTA:
 - отдельный блок с другим цветом
@@ -217,10 +222,18 @@ CTA:
 Только источники:
 - https://images.unsplash.com
 - https://images.pexels.com
+- https://image.pollinations.ai/prompt/...
+
+Для Pollinations:
+- используй URL вида https://image.pollinations.ai/prompt/ТВОЙ_ПРОМПТ?width=1280&height=720
+- промпт в URL должен быть url-encoded (пробелы → %20 и т.п.)
 
 Запрещено:
 - пустые src
 - placeholder
+- data:image/... base64 в src (никаких inline-base64 изображений)
+- любые data: URL в CSS (background/cursor и т.д.)
+- кастомный cursor через data: URL
 
 ${mapEmbedInstructions(mapProvider)}
 
