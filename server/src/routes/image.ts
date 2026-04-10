@@ -1,9 +1,14 @@
 import type { Request, Response } from "express";
 import { Router } from "express";
-import { getImageUrl, resolveImageProvider, toPollinationsImageUrl } from "../services/imageGen.js";
+import {
+  getImageUrl,
+  pickCuratedStockImageUrl,
+  resolveImageProvider,
+  toPollinationsImageUrl,
+} from "../services/imageGen.js";
 
 const router = Router();
-const IMAGE_TIMEOUT_MS = 7000;
+const IMAGE_TIMEOUT_MS = 12_000;
 const STATIC_FALLBACK_IMAGE_URL =
   "https://images.pexels.com/photos/325185/pexels-photo-325185.jpeg?auto=compress&cs=tinysrgb&w=1400&h=900&dpr=1";
 
@@ -33,21 +38,34 @@ router.get("/", async (req: Request, res: Response) => {
   const height = Number.isFinite(hRaw) ? hRaw : 768;
   res.setHeader("Cache-Control", "no-store");
 
+  const stockFirst = process.env.IMAGE_STOCK_FIRST?.trim().toLowerCase() === "true";
+
   try {
+    if (stockFirst) {
+      const stockUrl = pickCuratedStockImageUrl(prompt, { width, height });
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 2000);
+        const head = await fetch(stockUrl, { method: "HEAD", signal: ctrl.signal, redirect: "follow" });
+        clearTimeout(t);
+        const ct = head.headers.get("content-type") || "";
+        if (head.ok && ct.startsWith("image/")) {
+          res.redirect(302, stockUrl);
+          return;
+        }
+      } catch {}
+    }
+
     const provider = resolveImageProvider();
     let url: string;
     try {
       url = await withTimeout(getImageUrl(provider, prompt, { width, height }), IMAGE_TIMEOUT_MS);
     } catch (err) {
-      // Если выбран Doubao и он недоступен/не настроен, не ломаем страницу: фолбэк на Pollinations.
       if (provider !== "doubao") throw err;
       url = toPollinationsImageUrl(prompt, { width, height });
     }
-    // Редиректим на конечный URL картинки — проще для браузера и не грузим API байтами.
     res.redirect(302, url);
   } catch (e) {
-    // Никогда не отдаём 502 для <img>, иначе на лендинге будут "битые" места.
-    // Последний фолбэк — стабильная статическая картинка.
     res.redirect(302, STATIC_FALLBACK_IMAGE_URL);
   }
 });

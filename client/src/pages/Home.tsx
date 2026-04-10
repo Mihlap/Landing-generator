@@ -4,8 +4,16 @@ import { postGenerate } from "../api/generate";
 import type { SiteLocale } from "../types";
 
 const descriptionHint: Record<SiteLocale, string> = {
-  ru: "Опишите, каким должен быть сайт: тема и город, для кого страница, какие блоки и акценты нужны, как с вами связаться. Чем конкретнее — тем точнее макет и текст.",
-  en: "Describe the site you want: topic and location, audience, sections and emphasis, how to contact you. More detail yields a better layout and copy.",
+  ru: `Пример: Краткое описание бизнеса и услуг
+Стиль: Описание атмосферы и визуального решения
+Цвета:[Основной фон + акцентные цвета (HEX или названия)
+Структура: Список обязательных секций через запятую
+Детали: Язык, тип анимаций, специфика текстов, особые требования`,
+  en: `Example: Short description of the business and services
+Style: Atmosphere and visual direction
+Colors: Main background + accent colors (HEX or names)
+Structure: Required sections, separated by commas
+Detais: Language, animation style, copy specifics, special requirements`,
 };
 
 const benefits = [
@@ -259,7 +267,7 @@ export default function Home() {
                       <textarea
                         id="prompt"
                         rows={6}
-                        className={`min-h-[11rem] max-h-[min(42dvh,17rem)] resize-y sm:min-h-[12rem] sm:max-h-[min(45dvh,19rem)] ${textareaClassName}`}
+                        className={`min-h-[11rem] max-h-[min(42dvh,17rem)] resize-none sm:min-h-[12rem] sm:max-h-[min(45dvh,19rem)] ${textareaClassName}`}
                         placeholder={descriptionHint[siteLocale]}
                         value={prompt}
                         onChange={onPromptChange}

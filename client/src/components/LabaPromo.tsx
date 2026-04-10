@@ -151,7 +151,6 @@ export function LabaPromoEditor() {
     }
 
     function scheduleFromAnchor() {
-      // После каждой новой генерации (touchEditorPromoAnchor) снова показываем подсказку через задержку.
       setDismissed(false);
       if (timerRef.current) {
         clearTimeout(timerRef.current);

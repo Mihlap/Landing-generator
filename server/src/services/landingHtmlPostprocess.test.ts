@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { enhanceLandingHtml, normalizeLayoutWidths } from "./landingHtmlPostprocess.js";
 
 describe("normalizeLayoutWidths", () => {
-  it("заменяет max-width: 70rem на 90rem", () => {
+  it("заменяет max-width: 70rem на ширину контента лендинга", () => {
     const out = normalizeLayoutWidths("<style>.c{max-width:70rem}</style>");
-    expect(out).toContain("90rem");
+    expect(out).toContain("118rem");
     expect(out).not.toMatch(/70rem/);
   });
 });
@@ -13,7 +13,7 @@ describe("enhanceLandingHtml", () => {
   it("подменяет узкий max-width из стилей модели перед инжектом", () => {
     const html = `<!DOCTYPE html><html><head><style>.container{max-width:70rem;margin:0 auto}</style></head><body><p>x</p></body></html>`;
     const out = enhanceLandingHtml(html);
-    expect(out).toMatch(/90rem/);
+    expect(out).toMatch(/118rem/);
     expect(out).not.toMatch(/max-width:\s*70rem/i);
   });
 
@@ -148,5 +148,34 @@ describe("enhanceLandingHtml", () => {
     const twice = enhanceLandingHtml(once);
     expect((twice.match(/id="lead-form"/g) || []).length).toBe(0);
     expect((twice.match(/data-landing-lead-form-fix/g) || []).length).toBe(1);
+  });
+
+  it("заменяет #services на существующую секцию, если services нет", () => {
+    const html = `<!DOCTYPE html><html><body><a href="#services">x</a><section id="gallery"></section></body></html>`;
+    const out = enhanceLandingHtml(html);
+    expect(out).toContain('href="#gallery"');
+  });
+
+  it("оборачивает подписку по email в footer в form", () => {
+    const html = `<html><body><footer><label for="e">e</label><input type="email" id="e"></footer></body></html>`;
+    const out = enhanceLandingHtml(html);
+    expect(out).toContain('id="newsletter-form"');
+  });
+
+  it("по умолчанию не заменяет Unsplash на /image", () => {
+    vi.unstubAllEnvs();
+    delete process.env.LANDING_REPLACE_STOCK_WITH_AI;
+    const html = `<!DOCTYPE html><html><head><title>T</title></head><body><img src="https://images.unsplash.com/photo-1?w=100" alt="rose"></body></html>`;
+    const out = enhanceLandingHtml(html);
+    expect(out).toContain("images.unsplash.com");
+    expect(out).not.toMatch(/src="\/image\?/);
+  });
+
+  it("по LANDING_REPLACE_STOCK_WITH_AI=true переписывает stock в /image", () => {
+    vi.stubEnv("LANDING_REPLACE_STOCK_WITH_AI", "true");
+    const html = `<!DOCTYPE html><html><head><title>T</title></head><body><img src="https://images.unsplash.com/photo-1?w=100" alt="rose"></body></html>`;
+    const out = enhanceLandingHtml(html);
+    expect(out).toMatch(/\/image\?/);
+    vi.unstubAllEnvs();
   });
 });

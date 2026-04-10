@@ -8,7 +8,9 @@ const IMAGE_RETRY_MARKER = "data-landing-image-retry-fix";
 const LAYOUT_MARKER = "data-landing-layout-fix";
 const STRUCTURE_MARKER = "data-landing-structure-fix";
 
-export const LANDING_CONTENT_WIDTH = "min(90rem, calc(100% - 2rem))";
+export const LANDING_CONTENT_WIDTH = "min(118rem, calc(100% - 2rem))";
+
+const LANDING_CONTENT_REM = /^min\((\d+(?:\.\d+)?)rem/.exec(LANDING_CONTENT_WIDTH)?.[1] ?? "118";
 
 export function normalizeLayoutWidths(html: string): string {
   const W = LANDING_CONTENT_WIDTH;
@@ -17,7 +19,7 @@ export function normalizeLayoutWidths(html: string): string {
     .replace(/max-width\s*:\s*11[0-9]{2}px\b/gi, `max-width: ${W}`)
     .replace(/max-width\s*:\s*1200px\b/gi, `max-width: ${W}`)
     .replace(/max-width\s*:\s*1140px\b/gi, `max-width: ${W}`)
-    .replace(/min\s*\(\s*7[0-2]rem\s*,/gi, "min(90rem,");
+    .replace(/min\s*\(\s*7[0-2]rem\s*,/gi, `min(${LANDING_CONTENT_REM}rem,`);
 }
 
 const FALLBACK_IMAGE_SRC =
@@ -58,7 +60,7 @@ const ANCHOR_SCRIPT = `<script ${ANCHOR_MARKER}="1">
       var byId=document.getElementById(byPath);
       if(byId)return byId;
     }
-    var fallbackIds=["lead-form","contact-form","contact","contacts","signup","cta"];
+    var fallbackIds=["lead-form","newsletter-form","contact-form","contact","contacts","signup","cta"];
     for(var i=0;i<fallbackIds.length;i++){
       var f=document.getElementById(fallbackIds[i]);
       if(f)return f;
@@ -68,7 +70,7 @@ const ANCHOR_SCRIPT = `<script ${ANCHOR_MARKER}="1">
   function isLeadCtaText(text){
     var t=String(text||"").trim().toLowerCase();
     if(!t)return false;
-    return /(оставьте заявку|записаться|запишитесь|заказать|оставить заявку|book|order|contact us|send request)/i.test(t);
+    return /(оставьте заявку|записаться|запишитесь|заказать|оставить заявку|собрать букет|оформить заказ|подписаться|book|order|contact us|send request|get started)/i.test(t);
   }
   document.addEventListener("click",function(e){
     var anchor=e.target&&e.target.closest&&e.target.closest("a[href]");
@@ -246,49 +248,63 @@ const LEAD_ALIGN_SCRIPT = `<script ${LEAD_ALIGN_MARKER}="1">
 
 const IMAGE_RETRY_SCRIPT = `<script ${IMAGE_RETRY_MARKER}="1">
 (function(){
-  var RETRIES = 10;
-  var RETRY_DELAYS_MS = [2000, 3500, 5500, 8000, 11000];
-  function isRetryableSrc(src){
-    return /^\\/image\\?/i.test(String(src||""));
+  var FALLBACK=${JSON.stringify(FALLBACK_IMAGE_SRC)};
+  var MAX = 14;
+  var DELAYS = [350, 700, 1200, 2000, 3200, 5000, 8000];
+  function isProxySrc(src){
+    var s = String(src||"");
+    return /^\\/image\\?/i.test(s) || /https?:\\/\\/[^/]+\\/image\\?/i.test(s);
   }
-  function withRetryParam(src, attempt){
-    var sep = src.indexOf("?") >= 0 ? "&" : "?";
-    return src + sep + "retry=" + attempt + "-" + Date.now();
+  function stripRetryParams(u){
+    var s = String(u||"").split("#")[0];
+    s = s.replace(/([?&])retry=[^&]*/gi, function(_, a){ return a === "?" ? "?" : ""; });
+    s = s.replace(/[?&]$/,"");
+    return s;
   }
+  function ok(img){ return (img.naturalWidth||0) > 0; }
   function schedule(img){
     if(!(img instanceof HTMLImageElement)) return;
-    var baseSrc = img.getAttribute("src") || "";
-    if(!isRetryableSrc(baseSrc)) return;
-    if(img.dataset.retryScheduled === "1") return;
-    img.dataset.retryScheduled = "1";
-    var loadedOk = false;
-    if (img.complete && (img.naturalWidth || 0) > 0) {
-      loadedOk = true;
-    }
-    function markLoaded(){
-      loadedOk = true;
-    }
-    img.addEventListener("load", markLoaded, { once: true });
-    var attempt = 0;
-    function tick(){
-      if(loadedOk) return;
-      if(attempt >= RETRIES) return;
-      attempt += 1;
-      img.src = withRetryParam(baseSrc, attempt);
-      if (attempt < RETRIES) {
-        window.setTimeout(function(){
-          if (!loadedOk) tick();
-        }, RETRY_DELAYS_MS[attempt - 1] || 8000);
+    var raw = img.getAttribute("src") || "";
+    if(!isProxySrc(raw)) return;
+    if(img.dataset.landingImgRetry === "1") return;
+    img.dataset.landingImgRetry = "1";
+    var base = stripRetryParams(raw);
+    var n = 0;
+    var busy = false;
+    function bump(){
+      if(ok(img)) return;
+      if(busy) return;
+      if(n >= MAX){
+        img.removeAttribute("src");
+        img.src = FALLBACK;
+        return;
       }
+      busy = true;
+      n += 1;
+      var sep = base.indexOf("?") >= 0 ? "&" : "?";
+      img.src = base + sep + "retry=" + n + "-" + Date.now();
+      window.setTimeout(function(){ busy = false; }, 80);
     }
-    window.setTimeout(function(){
-      if (!loadedOk) tick();
-    }, RETRY_DELAYS_MS[0] || 2000);
+    img.addEventListener("error", function(){
+      window.setTimeout(bump, DELAYS[Math.min(n, DELAYS.length-1)] || 2500);
+    });
+    if(img.complete && !ok(img)){
+      window.setTimeout(bump, DELAYS[0]);
+    }
+    if("IntersectionObserver" in window){
+      var io = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if(e.isIntersecting && !ok(img) && img.dataset.landingImgIo !== "1"){
+            img.dataset.landingImgIo = "1";
+            bump();
+          }
+        });
+      }, { rootMargin: "120px", threshold: 0.01 });
+      io.observe(img);
+    }
   }
   function init(){
-    document.querySelectorAll("img[src]").forEach(function(node){
-      schedule(node);
-    });
+    document.querySelectorAll("img[src]").forEach(schedule);
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
@@ -307,8 +323,8 @@ header, nav { width: 100%; }
 
 const STRUCTURE_STYLE = `<style ${STRUCTURE_MARKER}="1">
 main, section, .container {
-  width: min(90rem, calc(100% - 2rem)) !important;
-  max-width: min(90rem, calc(100% - 2rem)) !important;
+  width: ${LANDING_CONTENT_WIDTH} !important;
+  max-width: ${LANDING_CONTENT_WIDTH} !important;
   margin-left: auto !important;
   margin-right: auto !important;
   box-sizing: border-box;
@@ -328,15 +344,15 @@ header [class*="nav"] {
   box-shadow: none !important;
 }
 header > *:not(style):not(script) {
-  width: min(90rem, calc(100% - 2rem)) !important;
-  max-width: min(90rem, calc(100% - 2rem)) !important;
+  width: ${LANDING_CONTENT_WIDTH} !important;
+  max-width: ${LANDING_CONTENT_WIDTH} !important;
   margin-left: auto !important;
   margin-right: auto !important;
 }
 footer {
   align-self: stretch;
-  width: min(90rem, calc(100% - 2rem)) !important;
-  max-width: min(90rem, calc(100% - 2rem)) !important;
+  width: ${LANDING_CONTENT_WIDTH} !important;
+  max-width: ${LANDING_CONTENT_WIDTH} !important;
   margin-left: auto !important;
   margin-right: auto !important;
   box-sizing: border-box;
@@ -347,7 +363,6 @@ section {
   padding-left: clamp(1rem, 3vw, 1.5rem);
   padding-right: clamp(1rem, 3vw, 1.5rem);
 }
-/* Когда модель делает HERO flex-рядом-с-картинкой, текстовый контейнер часто "прилипает" к краю. */
 [data-landing-title-fix="1"] > div:first-child,
 section[class*="hero" i] > div:first-child {
   padding-left: clamp(.5rem, 2vw, 1.25rem);
@@ -365,7 +380,6 @@ section .cards, section .grid, section .services, section .reviews, section .ben
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 1rem;
 }
-/* Универсальный фикс: генератор часто делает .*-list без gap, и карточки "слипаются". */
 section [class*="list"],
 section [class*="cards"],
 section [class*="grid"],
@@ -461,13 +475,13 @@ img { display: block; max-width: 100%; height: auto; border-radius: 12px; }
 *:not(iframe), *::before, *::after { max-width: 100%; }
 iframe {
   box-sizing: border-box;
-  max-width: min(90rem, calc(100% - 2rem));
+  max-width: ${LANDING_CONTENT_WIDTH};
   width: 100%;
   min-height: 280px;
   border: 0;
 }
 [data-landing-hero-image="1"] {
-  width: min(90rem, calc(100% - 2rem));
+  width: ${LANDING_CONTENT_WIDTH};
   margin: 1.25rem auto 0;
 }
 [data-landing-hero-image="1"] img {
@@ -500,11 +514,38 @@ section[class*="hero" i] > div:first-child {
   text-align: center !important;
 }
 [data-landing-visuals="1"] {
-  width: min(90rem, calc(100% - 2rem));
+  width: ${LANDING_CONTENT_WIDTH};
   margin: 1rem auto 0;
   display: grid;
   gap: .9rem;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+@media (max-width: 1024px) {
+  section {
+    padding-left: clamp(0.65rem, 2.5vw, 1rem) !important;
+    padding-right: clamp(0.65rem, 2.5vw, 1rem) !important;
+  }
+  section ul:not(nav ul):not(header ul),
+  section .cards, section .grid, section .services, section .reviews, section .benefits, section .process {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)) !important;
+  }
+}
+@media (max-width: 767px) {
+  html { -webkit-text-size-adjust: 100%; }
+  section ul:not(nav ul):not(header ul),
+  section .cards, section .grid, section .services, section .reviews, section .benefits, section .process {
+    grid-template-columns: 1fr !important;
+  }
+  section [class*="list"]:not(nav *):not(header *),
+  section [class*="cards"],
+  section [class*="grid"]:not(.container) {
+    grid-template-columns: 1fr !important;
+  }
+  [data-landing-title-fix="1"],
+  header[class*="hero" i],
+  section[class*="hero" i] {
+    flex-direction: column !important;
+  }
 }
 [data-landing-visuals="1"] img {
   width: 100%;
@@ -630,28 +671,6 @@ form button[type="submit"] {
 form button[type="submit"]:hover { filter: brightness(1.05); }
 </style>`;
 
-const LEAD_FORM_SECTION = `<section id="lead-form" ${LEAD_FORM_MARKER}="1">
-  <h2>Оставьте заявку за 1 минуту</h2>
-  <p>Мы свяжемся с вами, уточним детали и подберем удобное время.</p>
-  <form class="lf-grid" action="#" method="post">
-    <div>
-      <label for="lf-name">Ваше имя</label>
-      <input id="lf-name" name="name" type="text" placeholder="Например, Алексей" autocomplete="name" />
-    </div>
-    <div>
-      <label for="lf-phone">Телефон</label>
-      <input id="lf-phone" name="phone" type="tel" placeholder="+7 (999) 000-00-00" autocomplete="tel" />
-    </div>
-    <div class="lf-col-2">
-      <label for="lf-comment">Комментарий</label>
-      <textarea id="lf-comment" name="comment" rows="4" placeholder="Какая услуга вас интересует?"></textarea>
-    </div>
-    <div class="lf-col-2 lf-actions">
-      <button type="submit" class="lf-submit">Отправить заявку</button>
-    </div>
-  </form>
-</section>`;
-
 function normalizeId(value: string): string {
   return decodeURIComponent(value)
     .trim()
@@ -769,6 +788,36 @@ function ensureContactSectionAnchors(html: string): string {
   return html;
 }
 
+function collectHtmlIds(html: string): Set<string> {
+  const set = new Set<string>();
+  const re = /\sid\s*=\s*["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) set.add(m[1].toLowerCase());
+  return set;
+}
+
+function fixIncompleteSectionAnchors(html: string): string {
+  const ids = collectHtmlIds(html);
+  const has = (id: string) => ids.has(id.toLowerCase());
+  if (has("services")) return html;
+  const target = has("gallery") ? "gallery" : has("benefits") ? "benefits" : has("contact") ? "contact" : "";
+  if (!target) return html;
+  return html.replace(/href\s*=\s*(["'])#services\1/gi, `href="#${target}"`);
+}
+
+function ensureFooterNewsletterForm(html: string): string {
+  if (/\bid\s*=\s*["']newsletter-form["']/i.test(html)) return html;
+  return html.replace(/<footer\b([^>]*)>([\s\S]*?)<\/footer>/gi, (full, attrs: string, inner: string) => {
+    if (/<form\b/i.test(inner)) return full;
+    if (!/type\s*=\s*["']email["']/i.test(inner)) return full;
+    return `<footer${attrs}><form id="newsletter-form" class="landing-newsletter-form" method="get" action="#">${inner}</form></footer>`;
+  });
+}
+
+function shouldReplaceStockWithAi(): boolean {
+  return process.env.LANDING_REPLACE_STOCK_WITH_AI?.trim().toLowerCase() === "true";
+}
+
 function fillEmptyImagePlaceholders(html: string): string {
   return html.replace(
     /<div\b([^>]*class=["'][^"']*(?:image|img|photo|media|hero)[^"']*["'][^>]*)>([\s\n\r]*)<\/div>/gi,
@@ -799,22 +848,6 @@ function ensureVisualCoverage(html: string): string {
 }
 
 function ensureLeadForm(html: string): string {
-  // if (/\sid\s*=\s*["']lead-form["']/i.test(html) || html.includes(`${LEAD_FORM_MARKER}="1"`)) {
-  //   return html;
-  // }
-  // if (/<form\b/i.test(html)) {
-  //   return html.replace(/<form\b(?![^>]*\sid=)([^>]*)>/i, `<form id="lead-form" ${LEAD_FORM_MARKER}="1"$1>`);
-  // }
-  // if (/<footer\b[^>]*>/i.test(html)) {
-  //   return html.replace(/<footer\b/gi, `${LEAD_FORM_SECTION}\n<footer`);
-  // }
-  // if (/<\/body\s*>/i.test(html)) {
-  //   return html.replace(/<\/body\s*>/i, `${LEAD_FORM_SECTION}</body>`);
-  // }
-  // if (/<\/html\s*>/i.test(html)) {
-  //   return html.replace(/<\/html\s*>/i, `${LEAD_FORM_SECTION}</html>`);
-  // }
-  // return `${html}\n${LEAD_FORM_SECTION}`;
   return html;
 }
 
@@ -866,11 +899,13 @@ export function enhanceLandingHtml(html: string, fallbackImageSrc: string = FALL
   const withSanitizedCssDataUrls = sanitizeInlineCssDataUrls(withLayoutWidths);
   const withSafeBgImages = ensureBackgroundImagesHaveSource(withSanitizedCssDataUrls);
   const withSafeImages = ensureImageTagsHaveSource(withSafeBgImages);
-  const withContactAnchors = ensureContactSectionAnchors(withSafeImages);
-  const withImagePlaceholders = fillEmptyImagePlaceholders(withContactAnchors);
+  const withFixedSectionAnchors = fixIncompleteSectionAnchors(withSafeImages);
+  const withContactAnchors = ensureContactSectionAnchors(withFixedSectionAnchors);
+  const withNewsletterForm = ensureFooterNewsletterForm(withContactAnchors);
+  const withImagePlaceholders = fillEmptyImagePlaceholders(withNewsletterForm);
   const withHeroTitleFix = normalizeHeroHeadingSurface(withImagePlaceholders);
   const withHeroImage = ensureAtLeastOneHeroImage(withHeroTitleFix);
-  const withAiImages = replaceStockImagesWithAi(withHeroImage);
+  const withAiImages = shouldReplaceStockWithAi() ? replaceStockImagesWithAi(withHeroImage) : withHeroImage;
   const withVisualCoverage = ensureVisualCoverage(withAiImages);
   const withLeadForm = ensureLeadForm(withVisualCoverage);
   const normalizedLinks = rewriteInternalLinksToAnchors(withLeadForm);

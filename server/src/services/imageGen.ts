@@ -11,6 +11,44 @@ function clampSize(size: Size): Size {
   };
 }
 
+/** Короткий список стабильных Unsplash-фото: без API, подбирается по ключевым словам промпта. */
+const UNSPLASH_FLOWER_IDS = [
+  "photo-1563241527-3004b7be0ffd",
+  "photo-1490750967868-88aa4486c946",
+  "photo-1518882605630-8e3e4de6c1e3",
+  "photo-1582792182709-0f92e52964f5",
+  "photo-1455659817273-f96807779a8a",
+  "photo-1520763185298-35f360db26a1",
+];
+
+const UNSPLASH_GENERIC_IDS = [
+  "photo-1460925895917-afdab827c52f",
+  "photo-1557804506-669a67965ba0",
+  "photo-1552664730-d307ca884978",
+  "photo-1522071820081-009f0129c71c",
+  "photo-1504384308090-c894fdcc538d",
+];
+
+function hashPrompt(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+export function pickCuratedStockImageUrl(prompt: string, size: Size): string {
+  const s = clampSize(size);
+  const w = s.width;
+  const h = s.height;
+  const p = prompt.toLowerCase();
+  const isFlower =
+    /цвет|букет|роз|пион|тюльпан|флор|сухоцвет|flower|bouquet|rose|florist|wedding|peony|tulip/i.test(
+      p,
+    );
+  const pool = isFlower ? UNSPLASH_FLOWER_IDS : UNSPLASH_GENERIC_IDS;
+  const id = pool[hashPrompt(prompt) % pool.length]!;
+  return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&h=${h}&q=80`;
+}
+
 export function resolveImageProvider(): ImageProvider {
   const raw = String(process.env.IMAGE_PROVIDER || "").trim().toLowerCase();
   if (raw === "doubao") return "doubao";
@@ -95,7 +133,6 @@ export async function getImageUrl(provider: ImageProvider, prompt: string, size:
 
   const job = (async () => {
     const url = await generateDoubaoImageUrl(p, size);
-    // Короткий кеш, чтобы не жечь лимиты на одинаковых запросах.
     cache.set(key, { url, expiresAt: Date.now() + 30 * 60 * 1000 });
     return url;
   })().finally(() => {

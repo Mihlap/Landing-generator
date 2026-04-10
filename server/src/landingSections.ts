@@ -35,7 +35,7 @@ const BASE_STYLE = `
   .lp *, .lp *::before, .lp *::after { box-sizing: border-box; }
   .lp-wrap {
     width: 100%;
-    max-width: min(90rem, 100%);
+    max-width: min(118rem, 100%);
     margin-inline: auto;
     padding-inline: clamp(1rem, 4vw, 2rem);
   }
