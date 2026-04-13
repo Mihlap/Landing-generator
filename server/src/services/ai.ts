@@ -1,9 +1,11 @@
 import { getLandingCompositionDefaults } from "../landingCompositionDefaults.js";
 import { isTemplateId, type TemplateId } from "../templateId.js";
+import type { EnhanceLandingHtmlOptions } from "./landingHtmlPostprocess.js";
 import { enhanceLandingHtml } from "./landingHtmlPostprocess.js";
+import { repairLandingHtml, validateLandingHtml } from "./landingHtmlValidate.js";
 import { type LlmProvider, resolveLlmProvider, runLlmCompletion, runLlmLandingHtml } from "./llm.js";
 import { analyzePrompt, buildEnrichedUserMessage } from "./aiContext.js";
-import { inferMapEmbedProviderFromPrompt, systemPrompt, systemPromptHtml } from "./aiPrompts.js";
+import { inferMapEmbedProviderFromPrompt, systemPrompt, systemPromptHtml, systemPromptLandingHtmlFixer } from "./aiPrompts.js";
 import {
   extractHtmlFromModelOutput,
   extractTitleFromHtml,
@@ -16,6 +18,8 @@ import {
 } from "./aiUtils.js";
 
 export { inferTemplateFromPrompt, landingBuildMode } from "./aiUtils.js";
+
+export type GenerateLandingOptions = EnhanceLandingHtmlOptions;
 
 export type SiteLocale = "ru" | "en";
 
@@ -119,13 +123,47 @@ function htmlGenerationLimits(): { maxAttempts: number; timeoutMs: number } {
   };
 }
 
+function landingHtmlFixerEnabled(): boolean {
+  return process.env.LANDING_HTML_FIXER?.trim().toLowerCase() === "true";
+}
+
+async function maybeRepairWithLlm(params: {
+  provider: LlmProvider;
+  locale: SiteLocale;
+  themedImage: string;
+  enhanceOptions?: EnhanceLandingHtmlOptions;
+  html: string;
+}): Promise<string> {
+  const { provider, locale, themedImage, enhanceOptions, html } = params;
+  if (!landingHtmlFixerEnabled()) return html;
+
+  let issues = validateLandingHtml(html);
+  if (!issues.length) return html;
+
+  const fixerSystem = systemPromptLandingHtmlFixer(locale);
+  const payload = JSON.stringify(issues);
+  const body = html.length > 100_000 ? `${html.slice(0, 100_000)}\n<!-- truncated -->` : html;
+  const fixerUser = `Issues:\n${payload}\n\nHTML:\n${body}`;
+
+  try {
+    const raw = await runLlmLandingHtml(provider, fixerSystem, fixerUser);
+    const fixed = extractHtmlFromModelOutput(raw);
+    const out = repairLandingHtml(enhanceLandingHtml(fixed, themedImage, enhanceOptions));
+    if (isPlausibleHtml(out)) return out;
+  } catch {
+  }
+  return html;
+}
+
 async function generateHtmlWithRetries(params: {
   provider: LlmProvider;
   system: string;
   userMessage: string;
   themedImage: string;
+  locale: SiteLocale;
+  enhanceOptions?: EnhanceLandingHtmlOptions;
 }): Promise<string> {
-  const { provider, system, userMessage, themedImage } = params;
+  const { provider, system, userMessage, themedImage, locale, enhanceOptions } = params;
   const { maxAttempts, timeoutMs } = htmlGenerationLimits();
   const deadline = Date.now() + timeoutMs;
   let lastValidHtml = "";
@@ -133,7 +171,15 @@ async function generateHtmlWithRetries(params: {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (Date.now() >= deadline) break;
     const raw = await runLlmLandingHtml(provider, system, userMessage);
-    const candidate = enhanceLandingHtml(extractHtmlFromModelOutput(raw), themedImage);
+    let candidate = enhanceLandingHtml(extractHtmlFromModelOutput(raw), themedImage, enhanceOptions);
+    candidate = repairLandingHtml(candidate);
+    candidate = await maybeRepairWithLlm({
+      provider,
+      locale,
+      themedImage,
+      enhanceOptions,
+      html: candidate,
+    });
     if (!isPlausibleHtml(candidate)) continue;
     lastValidHtml = candidate;
     if (hasRenderableImages(candidate)) return candidate;
@@ -484,11 +530,23 @@ ${prompt}
   return { ...mockLanding(prompt, locale), locale };
 }
 
-export async function generateLandingContent(prompt: string, locale: SiteLocale): Promise<LandingData> {
+export async function generateLandingContent(
+  prompt: string,
+  locale: SiteLocale,
+  options?: GenerateLandingOptions,
+): Promise<LandingData> {
   const provider = resolveLlmProvider();
   if (provider === "none") {
     return { ...mockLanding(prompt, locale), locale };
   }
+
+  const enhanceOptions: EnhanceLandingHtmlOptions | undefined = options
+    ? {
+        layoutMode: options.layoutMode,
+        imagePreference: options.imagePreference,
+        skipVisualEnrichment: options.skipVisualEnrichment,
+      }
+    : undefined;
 
   if (landingBuildMode(provider) === "html") {
     try {
@@ -499,7 +557,14 @@ export async function generateLandingContent(prompt: string, locale: SiteLocale)
       const userMessage = buildEnrichedUserMessage(prompt, ctx, y);
       const templateId = inferTemplateFromPrompt(prompt);
       const themedImage = themedFallbackImageByPrompt(prompt, templateId);
-      const html = await generateHtmlWithRetries({ provider, system, userMessage, themedImage });
+      const html = await generateHtmlWithRetries({
+        provider,
+        system,
+        userMessage,
+        themedImage,
+        locale,
+        enhanceOptions,
+      });
 
       const title = normalizeGeneratedTitle(extractTitleFromHtml(html) ?? prompt.trim().slice(0, 120), locale);
       const filler = mockLanding(prompt, locale);
@@ -520,7 +585,14 @@ export async function generateLandingContent(prompt: string, locale: SiteLocale)
           const userMessage = buildEnrichedUserMessage(prompt, ctx, y);
           const templateId = inferTemplateFromPrompt(prompt);
           const themedImage = themedFallbackImageByPrompt(prompt, templateId);
-          const html = await generateHtmlWithRetries({ provider: "gigachat", system, userMessage, themedImage });
+          const html = await generateHtmlWithRetries({
+            provider: "gigachat",
+            system,
+            userMessage,
+            themedImage,
+            locale,
+            enhanceOptions,
+          });
 
           const title = normalizeGeneratedTitle(extractTitleFromHtml(html) ?? prompt.trim().slice(0, 120), locale);
           const filler = mockLanding(prompt, locale);

@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { Router } from "express";
 import { generateLandingContent, type SiteLocale } from "../services/ai.js";
-import { isSiteLocale } from "../validation.js";
+import { isLandingLayoutMode, isSiteLocale } from "../validation.js";
 
 const router = Router();
 
@@ -13,8 +13,11 @@ router.post("/", async (req: Request, res: Response) => {
   }
   const rawLocale = req.body?.locale;
   const locale: SiteLocale = isSiteLocale(rawLocale) ? rawLocale : "ru";
+  const layoutMode = isLandingLayoutMode(req.body?.layoutMode) ? req.body.layoutMode : undefined;
   try {
-    const data = await generateLandingContent(prompt, locale);
+    const data = await generateLandingContent(prompt, locale, {
+      ...(layoutMode ? { layoutMode } : {}),
+    });
     res.json(data);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Generation failed";

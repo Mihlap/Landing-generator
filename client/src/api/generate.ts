@@ -2,11 +2,23 @@ import type { LandingData, SiteLocale } from "../types";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
-export async function postGenerate(prompt: string, locale: SiteLocale): Promise<LandingData> {
+export type GenerateRequestOptions = {
+  layoutMode?: "full" | "minimal";
+};
+
+export async function postGenerate(
+  prompt: string,
+  locale: SiteLocale,
+  options?: GenerateRequestOptions,
+): Promise<LandingData> {
   const res = await fetch("/generate", {
     method: "POST",
     headers: jsonHeaders,
-    body: JSON.stringify({ prompt, locale }),
+    body: JSON.stringify({
+      prompt,
+      locale,
+      ...(options?.layoutMode ? { layoutMode: options.layoutMode } : {}),
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

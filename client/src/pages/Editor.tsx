@@ -5,6 +5,18 @@ import { touchEditorPromoAnchor } from "../components/LabaPromo";
 import { LOCATION_FROM_EDITOR } from "../constants/navigation";
 import type { LandingData } from "../types";
 
+function ensurePreviewBaseHref(html: string): string {
+  if (typeof window === "undefined") return html;
+  const origin = window.location.origin;
+  if (!origin || /^(null|file:)/i.test(origin)) return html;
+  if (/<base\b[^>]*\bhref\s*=/i.test(html)) return html;
+  const tag = `<base href="${origin}/" />`;
+  if (/<head(\s[^>]*)?>/i.test(html)) {
+    return html.replace(/<head(\s[^>]*)?>/i, `<head$1>${tag}`);
+  }
+  return `<!DOCTYPE html><html><head>${tag}</head><body>${html}</body></html>`;
+}
+
 function normalizeData(raw: LandingData | undefined): LandingData | undefined {
   if (!raw) return undefined;
   return {
@@ -59,6 +71,7 @@ export default function Editor() {
   const landingData = data;
 
   const previewHtml = draftHtml || html;
+  const previewSrcDoc = useMemo(() => ensurePreviewBaseHref(previewHtml), [previewHtml]);
 
   useEffect(() => {
     if (editing) {
@@ -109,44 +122,9 @@ export default function Editor() {
   }, []);
 
   const handlePreviewLoad = useCallback(() => {
-    const frame = iframeRef.current;
-    const doc = frame?.contentDocument;
-    const maxMs = 25_000;
-    const deadline = window.setTimeout(finishPreviewLoading, maxMs);
-
-    if (!doc?.body) {
-      window.setTimeout(finishPreviewLoading, 400);
-      window.clearTimeout(deadline);
-      return;
-    }
-
-    const imgs = Array.from(doc.querySelectorAll("img[src]")) as HTMLImageElement[];
-    if (imgs.length === 0) {
-      window.clearTimeout(deadline);
+    window.requestAnimationFrame(() => {
       finishPreviewLoading();
-      return;
-    }
-
-    let pending = 0;
-    const done = () => {
-      pending -= 1;
-      if (pending <= 0) {
-        window.clearTimeout(deadline);
-        finishPreviewLoading();
-      }
-    };
-
-    for (const img of imgs) {
-      if (img.complete && img.naturalWidth > 0) continue;
-      pending += 1;
-      img.addEventListener("load", done, { once: true });
-      img.addEventListener("error", done, { once: true });
-    }
-
-    if (pending === 0) {
-      window.clearTimeout(deadline);
-      finishPreviewLoading();
-    }
+    });
   }, [finishPreviewLoading]);
 
   return (
@@ -219,8 +197,8 @@ export default function Editor() {
         ) : previewHtml ? (
           <div className="relative min-h-[calc(100vh-4rem)]">
             {previewLoading ? (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/85 text-sm text-slate-600">
-                Загружаем изображения предпросмотра…
+              <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-white/90 px-2.5 py-1.5 text-xs text-slate-600 shadow-sm ring-1 ring-slate-200/80">
+                Разметка загружается…
               </div>
             ) : null}
             <iframe
@@ -228,7 +206,7 @@ export default function Editor() {
               onLoad={handlePreviewLoad}
               title="Предпросмотр лендинга"
               className="w-full min-h-[calc(100vh-4rem)] border-0"
-              srcDoc={previewHtml}
+              srcDoc={previewSrcDoc}
               allow="fullscreen; geolocation"
             />
           </div>

@@ -48,17 +48,17 @@ describe("HTTP API", () => {
         .send({ prompt: "стоматология", locale: "ru" })
         .expect(200);
       expect(res.body).toEqual(validLandingData);
-      expect(mockedGenerate).toHaveBeenCalledWith("стоматология", "ru");
+      expect(mockedGenerate).toHaveBeenCalledWith("стоматология", "ru", {});
     });
 
     it("невалидный locale даёт en только если en, иначе ru", async () => {
       mockedGenerate.mockResolvedValueOnce(validLandingData);
       await request(app).post("/generate").send({ prompt: "x", locale: "xx" }).expect(200);
-      expect(mockedGenerate).toHaveBeenCalledWith("x", "ru");
+      expect(mockedGenerate).toHaveBeenCalledWith("x", "ru", {});
 
       mockedGenerate.mockResolvedValueOnce({ ...validLandingData, locale: "en" });
       await request(app).post("/generate").send({ prompt: "y", locale: "en" }).expect(200);
-      expect(mockedGenerate).toHaveBeenCalledWith("y", "en");
+      expect(mockedGenerate).toHaveBeenCalledWith("y", "en", {});
     });
   });
 

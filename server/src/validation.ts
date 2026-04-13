@@ -1,11 +1,16 @@
 import type { LandingData, SiteLocale } from "./services/ai.js";
 import { isSectionKind } from "./services/ai.js";
+import type { LandingLayoutMode } from "./services/landingHtmlPostprocess.js";
 import { isTemplateId } from "./templateId.js";
 
 export { isTemplateId };
 
 export function isSiteLocale(x: unknown): x is SiteLocale {
   return x === "ru" || x === "en";
+}
+
+export function isLandingLayoutMode(x: unknown): x is LandingLayoutMode {
+  return x === "full" || x === "minimal";
 }
 
 export function isLandingData(x: unknown): x is LandingData {

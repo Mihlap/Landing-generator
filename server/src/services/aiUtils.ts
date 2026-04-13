@@ -1,5 +1,6 @@
 import type { TemplateId } from "../templateId.js";
 import type { LlmProvider } from "./llm.js";
+import { WIKIMEDIA_ALT_FALLBACK_JPEG, WIKIMEDIA_STATIC_FALLBACK_JPEG } from "./imageGen.js";
 
 type SiteLocale = "ru" | "en";
 
@@ -28,11 +29,11 @@ export function landingBuildMode(provider: LlmProvider | "none"): "template" | "
 
 function themedFallbackImage(templateId: TemplateId): string {
   const byTemplate: Record<TemplateId, string> = {
-    auto: "https://images.pexels.com/photos/3807329/pexels-photo-3807329.jpeg?auto=compress&cs=tinysrgb&w=1600",
-    dental: "https://images.pexels.com/photos/3845727/pexels-photo-3845727.jpeg?auto=compress&cs=tinysrgb&w=1600",
-    repair: "https://images.pexels.com/photos/5691623/pexels-photo-5691623.jpeg?auto=compress&cs=tinysrgb&w=1600",
-    realestate: "https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=1600",
-    ecommerce: "https://images.pexels.com/photos/6169056/pexels-photo-6169056.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    auto: WIKIMEDIA_STATIC_FALLBACK_JPEG,
+    dental: WIKIMEDIA_ALT_FALLBACK_JPEG,
+    repair: WIKIMEDIA_STATIC_FALLBACK_JPEG,
+    realestate: WIKIMEDIA_ALT_FALLBACK_JPEG,
+    ecommerce: WIKIMEDIA_STATIC_FALLBACK_JPEG,
   };
   return byTemplate[templateId];
 }
@@ -40,31 +41,31 @@ function themedFallbackImage(templateId: TemplateId): string {
 export function themedFallbackImageByPrompt(prompt: string, templateId: TemplateId): string {
   const p = prompt.toLowerCase();
   if (/авто|машин|шиномонтаж|автосервис|car|auto/i.test(p)) {
-    return "https://images.pexels.com/photos/3807329/pexels-photo-3807329.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
   }
   if (/стоматолог|зуб|dentist|dental/i.test(p)) {
-    return "https://images.pexels.com/photos/3845727/pexels-photo-3845727.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_ALT_FALLBACK_JPEG;
   }
   if (/недвижим|риелтор|real\s*estate|property|квартир|дом/i.test(p)) {
-    return "https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
   }
   if (/магазин|товар|каталог|ecommerce|online\s*store|shop/i.test(p)) {
-    return "https://images.pexels.com/photos/6169056/pexels-photo-6169056.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_ALT_FALLBACK_JPEG;
   }
   if (/парикмахер|паркмахер|барбер|салон\s*красоты|hair|barber|beauty/i.test(p)) {
-    return "https://images.pexels.com/photos/3993449/pexels-photo-3993449.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
   }
   if (/тюльпан|цветы|букет|флорист|flower|tulip|bouquet|florist/i.test(p)) {
-    return "https://images.pexels.com/photos/931177/pexels-photo-931177.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_ALT_FALLBACK_JPEG;
   }
   if (/ремонт|мастер|handyman|сантехник|электрик|repair/i.test(p)) {
-    return "https://images.pexels.com/photos/5691623/pexels-photo-5691623.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
   }
   if (/курс|обучение|школ|education|course/i.test(p)) {
-    return "https://images.pexels.com/photos/5212337/pexels-photo-5212337.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_ALT_FALLBACK_JPEG;
   }
   if (templateId === "auto") {
-    return "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1600";
+    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
   }
   return themedFallbackImage(templateId);
 }
@@ -76,11 +77,25 @@ export function normalizeGeneratedTitle(title: string, locale: SiteLocale): stri
   return withoutPrefix || (locale === "ru" ? "Бизнес" : "Business");
 }
 
+export function sliceOuterHtmlDocument(text: string): string {
+  const s = text.trim();
+  if (!s) return s;
+  const lower = s.toLowerCase();
+  const startDoctype = lower.indexOf("<!doctype html");
+  const startHtml = lower.indexOf("<html");
+  const start = startDoctype >= 0 ? startDoctype : startHtml >= 0 ? startHtml : -1;
+  if (start < 0) return s;
+  const fromDoc = s.slice(start);
+  const end = fromDoc.toLowerCase().lastIndexOf("</html>");
+  if (end < 0) return fromDoc.trim();
+  return fromDoc.slice(0, end + 7).trim();
+}
+
 export function extractHtmlFromModelOutput(text: string): string {
   let t = text.trim();
   const fenced = /```(?:html)?\s*\n([\s\S]*?)```/i.exec(t);
   if (fenced) t = fenced[1].trim();
-  return t.trim();
+  return sliceOuterHtmlDocument(t);
 }
 
 export function isPlausibleHtml(html: string): boolean {
@@ -90,6 +105,7 @@ export function isPlausibleHtml(html: string): boolean {
 
 export function hasRenderableImages(html: string): boolean {
   if (/<img\b[^>]*\ssrc\s*=\s*["']https?:\/\/[^"']+["']/i.test(html)) return true;
+  if (/<img\b[^>]*\ssrc\s*=\s*["']\/image\?[^"']+["']/i.test(html)) return true;
   if (/background-image\s*:\s*url\(["']https?:\/\/[^"']+["']\)/i.test(html)) return true;
   if (/url\(["']https?:\/\/[^"']+["']\)/i.test(html)) return true;
   return false;

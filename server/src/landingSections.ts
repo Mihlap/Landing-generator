@@ -35,7 +35,7 @@ const BASE_STYLE = `
   .lp *, .lp *::before, .lp *::after { box-sizing: border-box; }
   .lp-wrap {
     width: 100%;
-    max-width: min(118rem, 100%);
+    max-width: min(92rem, 100%);
     margin-inline: auto;
     padding-inline: clamp(1rem, 4vw, 2rem);
   }
@@ -416,7 +416,6 @@ function catalogCardSub(locale: SiteLocale): string {
   return locale === "ru" ? "Подробности по запросу" : "Details on request";
 }
 
-/** Порядок: герой первый, подвал последний; остальное — как в списке (без дубликатов). */
 export function normalizeSectionOrder(input: SectionKind[] | undefined): SectionKind[] {
   const seen = new Set<SectionKind>();
   const raw: SectionKind[] = [];

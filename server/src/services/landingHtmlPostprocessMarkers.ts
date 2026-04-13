@@ -1,0 +1,9 @@
+export const ANCHOR_MARKER = "data-landing-anchor-fix";
+export const FOOTER_MARKER = "data-landing-footer-fix";
+export const LEAD_FORM_MARKER = "data-landing-lead-form-fix";
+export const CONTACT_MARKER = "data-landing-contact-fix";
+export const CONTRAST_MARKER = "data-landing-contrast-fix";
+export const LEAD_ALIGN_MARKER = "data-landing-lead-align-fix";
+export const IMAGE_RETRY_MARKER = "data-landing-image-retry-fix";
+export const LAYOUT_MARKER = "data-landing-layout-fix";
+export const STRUCTURE_MARKER = "data-landing-structure-fix";

@@ -1,14 +1,18 @@
 import type { Request, Response } from "express";
 import { Router } from "express";
-import { getImageUrl, resolveImageProvider, toPollinationsImageUrl } from "../services/imageGen.js";
+import {
+  getImageUrl,
+  resolveImageProvider,
+  toPollinationsImageUrl,
+  WIKIMEDIA_STATIC_FALLBACK_JPEG,
+} from "../services/imageGen.js";
 import { isPaymentSucceededForExport } from "../services/yookassa.js";
 import { renderTemplate } from "../services/template.js";
 import { isLandingData } from "../validation.js";
 
 const router = Router();
 const EXPORT_IMAGE_TIMEOUT_MS = 7000;
-const STATIC_FALLBACK_IMAGE_URL =
-  "https://images.pexels.com/photos/325185/pexels-photo-325185.jpeg?auto=compress&cs=tinysrgb&w=1400&h=900&dpr=1";
+const STATIC_FALLBACK_IMAGE_URL = WIKIMEDIA_STATIC_FALLBACK_JPEG;
 
 function allowMockPaidExport(): boolean {
   return process.env.NODE_ENV === "test" || process.env.ALLOW_EXPORT_MOCK_PAID === "true";
@@ -52,14 +56,23 @@ async function ensureRenderableImageUrl(url: string): Promise<string> {
   }
 }
 
-async function resolveFinalImageUrl(prompt: string, width: number, height: number): Promise<string> {
+async function resolveFinalImageUrl(
+  prompt: string,
+  width: number,
+  height: number,
+  variation: number = 0,
+  landingSid: number = 0,
+): Promise<string> {
   const provider = resolveImageProvider();
   try {
-    const candidate = await withTimeout(getImageUrl(provider, prompt, { width, height }), EXPORT_IMAGE_TIMEOUT_MS);
+    const candidate = await withTimeout(
+      getImageUrl(provider, prompt, { width, height }, variation, landingSid),
+      EXPORT_IMAGE_TIMEOUT_MS,
+    );
     return await ensureRenderableImageUrl(candidate);
   } catch {
     if (provider === "doubao") {
-      const pollinations = toPollinationsImageUrl(prompt, { width, height });
+      const pollinations = toPollinationsImageUrl(prompt, { width, height }, variation, landingSid);
       return await ensureRenderableImageUrl(pollinations);
     }
     return STATIC_FALLBACK_IMAGE_URL;
@@ -67,34 +80,42 @@ async function resolveFinalImageUrl(prompt: string, width: number, height: numbe
 }
 
 async function replaceLocalImageSourcesForExport(html: string): Promise<string> {
-  const srcRegex = /(<img\b[^>]*\ssrc\s*=\s*["'])(\/image\?[^"']+)(["'][^>]*>)/gi;
+  const srcRegex = /(<img\b[^>]*\ssrc\s*=\s*["'])([^"']*\/image\?[^"']+)(["'][^>]*>)/gi;
   const matches = Array.from(html.matchAll(srcRegex));
   if (!matches.length) return html;
 
   const urlMap = new Map<string, string>();
 
   for (const match of matches) {
-    const localPath = match[2];
-    if (urlMap.has(localPath)) continue;
+    const srcValue = match[2] ?? "";
+    if (urlMap.has(srcValue)) continue;
 
     let finalUrl = STATIC_FALLBACK_IMAGE_URL;
     try {
-      const parsed = new URL(localPath, "http://localhost");
+      const parsed = new URL(srcValue, "http://localhost");
       const prompt = (parsed.searchParams.get("prompt") || "").trim() || "website section illustration";
       const w = Number(parsed.searchParams.get("w"));
       const h = Number(parsed.searchParams.get("h"));
+      const vRaw = Number(parsed.searchParams.get("v"));
+      const variation =
+        Number.isFinite(vRaw) && vRaw >= 0 ? Math.min(999, Math.floor(vRaw)) : 0;
+      const sidRaw = parsed.searchParams.get("sid");
+      const landingSid =
+        sidRaw && /^\d{1,15}$/.test(sidRaw.trim())
+          ? (Number(sidRaw.trim()) >>> 0)
+          : 0;
       const width = Number.isFinite(w) ? w : 1024;
       const height = Number.isFinite(h) ? h : 768;
-      finalUrl = await resolveFinalImageUrl(prompt, width, height);
+      finalUrl = await resolveFinalImageUrl(prompt, width, height, variation, landingSid);
     } catch {
       finalUrl = STATIC_FALLBACK_IMAGE_URL;
     }
 
-    urlMap.set(localPath, finalUrl);
+    urlMap.set(srcValue, finalUrl);
   }
 
-  return html.replace(srcRegex, (_full, p1: string, localPath: string, p3: string) => {
-    const resolved = urlMap.get(localPath) ?? STATIC_FALLBACK_IMAGE_URL;
+  return html.replace(srcRegex, (_full, p1: string, srcValue: string, p3: string) => {
+    const resolved = urlMap.get(srcValue) ?? STATIC_FALLBACK_IMAGE_URL;
     return `${p1}${resolved}${p3}`;
   });
 }

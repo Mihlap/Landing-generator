@@ -19,6 +19,7 @@ Detais: Language, animation style, copy specifics, special requirements`,
 const benefits = [
   "Шаблон под нишу — без пустых конструкторов",
   "Тексты и блоки страницы за один запрос",
+  "Иллюстрации подбираются автоматически",
   "Предпросмотр, редактирование и выгрузка HTML",
 ] as const;
 
@@ -249,8 +250,8 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <label htmlFor="prompt" className="text-xs font-medium text-slate-500">
+                    <div className="mb-1.5 flex items-end justify-between gap-2">
+                      <label htmlFor="prompt" className="pb-0.5 text-xs font-medium text-slate-500">
                         Описание задачи
                       </label>
                       <button
@@ -282,7 +283,7 @@ export default function Home() {
                     </p>
                   )}
 
-                  <div className="space-y-2 border-t border-slate-800/80 pt-5">
+                  <div className="border-t border-slate-800/80 pt-5">
                     <button
                       type="submit"
                       disabled={loading || !prompt.trim()}
@@ -290,7 +291,7 @@ export default function Home() {
                     >
                       {loading ? "Собираем страницу…" : "Собрать страницу"}
                     </button>
-                    <p className="text-pretty text-left text-[0.7rem] leading-relaxed text-slate-600">
+                    <p className="mt-4 text-pretty text-left text-xs font-medium leading-relaxed text-slate-400 sm:text-[0.7rem]">
                       Регистрация не нужна — только описание и черновик в редакторе
                     </p>
                   </div>

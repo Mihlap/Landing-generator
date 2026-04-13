@@ -34,6 +34,23 @@ describe("postGenerate", () => {
     );
   });
 
+  it("передаёт layoutMode", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(sample), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    await postGenerate("x", "en", { layoutMode: "minimal" });
+    expect(fetch).toHaveBeenCalledWith(
+      "/generate",
+      expect.objectContaining({
+        body: JSON.stringify({
+          prompt: "x",
+          locale: "en",
+          layoutMode: "minimal",
+        }),
+      }),
+    );
+  });
+
   it("бросает Error с текстом error из тела", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "prompt is required" }), { status: 400 }),
