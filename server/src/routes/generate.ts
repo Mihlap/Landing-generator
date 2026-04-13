@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { Router } from "express";
 import { generateLandingContent, type SiteLocale } from "../services/ai.js";
-import { isLandingLayoutMode, isSiteLocale } from "../validation.js";
+import { isLandingGenerateMode, isLandingLayoutMode, isSiteLocale } from "../validation.js";
 
 const router = Router();
 
@@ -14,9 +14,11 @@ router.post("/", async (req: Request, res: Response) => {
   const rawLocale = req.body?.locale;
   const locale: SiteLocale = isSiteLocale(rawLocale) ? rawLocale : "ru";
   const layoutMode = isLandingLayoutMode(req.body?.layoutMode) ? req.body.layoutMode : undefined;
+  const generateMode = isLandingGenerateMode(req.body?.generateMode) ? req.body.generateMode : undefined;
   try {
     const data = await generateLandingContent(prompt, locale, {
       ...(layoutMode ? { layoutMode } : {}),
+      ...(generateMode ? { generateMode } : {}),
     });
     res.json(data);
   } catch (e) {

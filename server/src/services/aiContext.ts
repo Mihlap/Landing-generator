@@ -21,7 +21,8 @@ export function analyzePrompt(prompt: string): LandingContext {
   if (/api|dev|platform/i.test(p)) tone = "technical";
 
   let style: LandingContext["style"] = "light";
-  if (niche === "auto") style = "dark";
+  if (/тёмн|темн|dark|ночн|уголь|charcoal/i.test(p)) style = "dark";
+  else if (niche === "auto") style = "dark";
   if (niche === "saas") style = "gradient";
   if (tone === "premium") style = "minimal";
 

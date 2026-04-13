@@ -15,6 +15,6 @@ describe("normalizeSectionOrder", () => {
     const o = normalizeSectionOrder(undefined);
     expect(o[0]).toBe("hero");
     expect(o[o.length - 1]).toBe("footer");
-    expect(o.length).toBe(9);
+    expect(o.length).toBe(11);
   });
 });

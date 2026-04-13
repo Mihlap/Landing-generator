@@ -96,4 +96,26 @@ describe("isLandingData", () => {
     expect(isLandingData({ ...base, reviews: [{}] })).toBe(false);
     expect(isLandingData({ ...base, reviews: [{ quote: 1, author: "a" }] })).toBe(false);
   });
+
+  it("принимает theme с разрешёнными CSS-переменными", () => {
+    expect(
+      isLandingData({
+        ...base,
+        theme: {
+          variables: { "--lp-accent": "#0369a1" },
+          fontFamily: "'Manrope', sans-serif",
+          fontLinkHref: "https://fonts.googleapis.com/css2?family=Manrope:wght@400&display=swap",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("отклоняет theme с неизвестным ключом variables", () => {
+    expect(
+      isLandingData({
+        ...base,
+        theme: { variables: { "--lp-evil": "red" } },
+      }),
+    ).toBe(false);
+  });
 });

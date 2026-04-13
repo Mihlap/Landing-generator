@@ -36,6 +36,12 @@ describe("resolveLlmProvider", () => {
     expect(resolveLlmProvider()).toBe("gigachat");
   });
 
+  it("без AI_PROVIDER при ключах GigaChat и Z.AI выбирает gigachat", () => {
+    vi.stubEnv("GIGACHAT_CREDENTIALS", "dGVzdA==");
+    vi.stubEnv("AI_ZZZ", "zai-key-test");
+    expect(resolveLlmProvider()).toBe("gigachat");
+  });
+
   it("при AI_PROVIDER=openai возвращает openai при наличии ключа", () => {
     vi.stubEnv("AI_PROVIDER", "openai");
     vi.stubEnv("OPENAI_API_KEY", "sk-test");

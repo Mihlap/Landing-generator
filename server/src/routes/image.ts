@@ -78,11 +78,14 @@ router.get("/", async (req: Request, res: Response) => {
   const height = Number.isFinite(hRaw) ? hRaw : 768;
   res.setHeader("Cache-Control", "no-store");
 
-  const stockFirstEnv = process.env.IMAGE_STOCK_FIRST?.trim().toLowerCase() === "true";
-  const wantStockFirst = preferRaw === "stock" || (preferRaw !== "gen" && stockFirstEnv);
+  const genFirstByEnv =
+    process.env.IMAGE_GEN_FIRST?.trim().toLowerCase() === "true" ||
+    process.env.IMAGE_STOCK_FIRST?.trim().toLowerCase() === "false";
+  const wantGenFirst = preferRaw === "gen" || genFirstByEnv;
+  const wantStockFirst = !wantGenFirst;
 
   try {
-    if (preferRaw !== "gen" && wantStockFirst) {
+    if (wantStockFirst) {
       if (stockSearchConfigured()) {
         try {
           const apiUrl = await withTimeout(

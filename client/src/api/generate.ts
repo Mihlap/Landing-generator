@@ -1,9 +1,10 @@
-import type { LandingData, SiteLocale } from "../types";
+import type { LandingData, LandingGenerateMode, SiteLocale } from "../types";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
 export type GenerateRequestOptions = {
   layoutMode?: "full" | "minimal";
+  generateMode?: LandingGenerateMode;
 };
 
 export async function postGenerate(
@@ -18,6 +19,7 @@ export async function postGenerate(
       prompt,
       locale,
       ...(options?.layoutMode ? { layoutMode: options.layoutMode } : {}),
+      ...(options?.generateMode ? { generateMode: options.generateMode } : {}),
     }),
   });
   if (!res.ok) {

@@ -55,4 +55,77 @@ describe("renderTemplate", () => {
     const html = renderTemplate("dental", validLandingData);
     expect(html).toContain("overflow-wrap");
   });
+
+  it("рендерит галерею и карту при данных", () => {
+    const html = renderTemplate("auto", {
+      ...validLandingData,
+      templateId: "auto",
+      sections: ["hero", "gallery", "map", "footer"],
+      galleryItems: [
+        {
+          src: "https://images.unsplash.com/photo-1486262715619-567beee29d4f?auto=format&fit=crop&w=720&q=75",
+          alt: "Первый",
+        },
+        {
+          src: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=720&q=75",
+          alt: "Второй",
+        },
+      ],
+      mapEmbedSrc: "https://yandex.ru/map-widget/v1/?ll=37.617635%2C55.755814&z=12",
+    });
+    expect(html).toContain("lp-gallery-grid");
+    expect(html).toContain('rel="preconnect"');
+    expect(html).toMatch(/images\.unsplash\.com|\/image\?prompt=/);
+    expect(html).toMatch(/rel="preload"[^>]+as="image"/);
+    expect(html).toMatch(/w=520/);
+    expect(html).toMatch(/loading="eager"[^>]*fetchpriority="high"/);
+    expect(html).toContain('loading="lazy"');
+    expect(html).toContain("lp-map-frame");
+    expect(html).toContain("yandex.ru/map-widget");
+  });
+
+  it("рендерит соцссылки в подвале (иконка для Telegram)", () => {
+    const html = renderTemplate("auto", {
+      ...validLandingData,
+      templateId: "auto",
+      sections: ["hero", "footer"],
+      socialLinks: [{ label: "TG", href: "https://t.me/example" }],
+    });
+    expect(html).toContain("lp-footer-social");
+    expect(html).toContain("https://t.me/example");
+    expect(html).toContain("lp-footer-icon");
+    expect(html).toContain('aria-label="TG"');
+  });
+
+  it("подключает theme: переменные, шрифт и Google Fonts link", () => {
+    const html = renderTemplate("dental", {
+      ...validLandingData,
+      templateId: "dental",
+      skinId: 8,
+      sections: ["hero", "footer"],
+      theme: {
+        variables: { "--lp-accent": "#0369a1", "--lp-page-bg": "#f0f9ff" },
+        fontFamily: "'Manrope', system-ui, sans-serif",
+        fontLinkHref: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;600&display=swap",
+      },
+    });
+    expect(html).toContain("fonts.googleapis.com/css2");
+    expect(html).toContain("--lp-accent: #0369a1");
+    expect(html).toContain("--lp-font-stack:");
+  });
+
+  it("для салона на шаблоне repair подставляет заголовки услуг/карты, не «ремонт»", () => {
+    const html = renderTemplate("repair", {
+      ...validLandingData,
+      title: "Женская парикмахерская «Стиль»",
+      templateId: "repair",
+      sections: ["hero", "services", "map", "footer"],
+      mapEmbedSrc: "https://yandex.ru/map-widget/v1/?ll=37.617635%2C55.755814&z=12",
+    });
+    expect(html).toContain(">Услуги<");
+    expect(html).toContain("Как нас найти");
+    expect(html).not.toContain("Что ремонтируем");
+    expect(html).not.toContain("Зона выезда");
+    expect(html).toContain("Красота и стиль");
+  });
 });

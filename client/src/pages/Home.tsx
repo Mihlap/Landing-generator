@@ -1,26 +1,51 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { postGenerate } from "../api/generate";
-import type { SiteLocale } from "../types";
+import type { LandingGenerateMode, SiteLocale } from "../types";
 
-const descriptionHint: Record<SiteLocale, string> = {
-  ru: `Пример: Краткое описание бизнеса и услуг
-Стиль: Описание атмосферы и визуального решения
-Цвета:[Основной фон + акцентные цвета (HEX или названия)
-Структура: Список обязательных секций через запятую
-Детали: Язык, тип анимаций, специфика текстов, особые требования`,
-  en: `Example: Short description of the business and services
-Style: Atmosphere and visual direction
-Colors: Main background + accent colors (HEX or names)
-Structure: Required sections, separated by commas
-Detais: Language, animation style, copy specifics, special requirements`,
+const promptPlaceholder: Record<LandingGenerateMode, Record<SiteLocale, string>> = {
+  template: {
+    ru: `Доступные шаблоны:
+• Стоматология, клиника, имплантация
+• Автосервис, СТО, шиномонтаж, диагностика
+• Мастер на час, ремонт, сантехник, электрик
+• Недвижимость, риелтор, продажа и аренда
+• Интернет-магазин, доставка, розница онлайн
+
+Как заполнить: напишите, какой из типов вам нужен (или одной фразой нишу — мы сопоставим с шаблоном). Дальше: название и город, услуги или прайс, аудитория, отличия от конкурентов, контакты, тон текстов. Можно явно попросить тёмную или светлую тему оформления, карту проезда, галерею с фото, ссылки на соцсети — соответствующие блоки подключатся к готовому шаблону. Не начинайте с нумерованного «техзадания» вроде «1. Один HTML…».`,
+    en: `Available templates (pick your vertical and describe your business for it):
+• Dental clinic, implants, oral care
+• Auto service, garage, tires, diagnostics
+• Handyman, home repair, plumbing, electrician
+• Real estate, realtor, sales and rentals
+• Online store, e‑commerce, delivery
+
+How to fill in: say which template fits (or describe your niche in one line — we map it). Then: business name and city, services or pricing, audience, differentiators, contacts, tone. You may ask for a dark/light visual theme, a map, a photo gallery, and social links — matching blocks are added to the fixed template. Do not start with a numbered spec like "1. Single HTML file…".`,
+  },
+  html: {
+    ru: `Один HTML-файл: ниша и атмосфера, цвета (#HEX), шрифты, список секций, анимации и эффекты.
+
+Пример структуры:
+— О бизнесе и услугах
+— Визуал и палитра
+— Секции страницы
+— Особые пожелания (язык, звук, адаптив)`,
+    en: `One HTML file: niche and mood, colors (#HEX), fonts, sections, motion and effects.
+
+Example outline:
+— Business and services
+— Visual direction and palette
+— Page sections
+— Extras (language, sound, responsive)`,
+  },
 };
 
 const benefits = [
-  "Шаблон под нишу — без пустых конструкторов",
+  "Лэндинг для бизнеса — без пустых конструкторов",
   "Тексты и блоки страницы за один запрос",
   "Иллюстрации подбираются автоматически",
-  "Предпросмотр, редактирование и выгрузка HTML",
+  "Предпросмотр, редактирование и выгрузка актуального HTML",
+  "Два режима: ИИ — ваш запрос, Шаблон — проверенные блоки под типовые ниши",
 ] as const;
 
 const IconExpand = memo(function IconExpand({ className }: { className?: string }) {
@@ -62,12 +87,16 @@ const IconCollapse = memo(function IconCollapse({ className }: { className?: str
 });
 
 const textareaClassName =
-  "w-full rounded-xl border border-slate-700/90 bg-slate-900/55 px-3 py-3 text-[0.9375rem] leading-relaxed text-slate-100 placeholder:text-slate-600 focus:border-indigo-500/45 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
+  "w-full overflow-y-auto rounded-xl border border-slate-700/90 bg-slate-900/55 px-3 py-3 text-[0.9375rem] leading-relaxed text-slate-100 placeholder:text-slate-600 focus:border-indigo-500/45 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
+
+const promptTextareaSizeClass =
+  "min-h-[11rem] max-h-[min(42dvh,17rem)] sm:min-h-[12rem] sm:max-h-[min(45dvh,19rem)]";
 
 export default function Home() {
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
   const [siteLocale, setSiteLocale] = useState<SiteLocale>("ru");
+  const [generateMode, setGenerateMode] = useState<LandingGenerateMode>("html");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
@@ -76,6 +105,8 @@ export default function Home() {
   const openExpandedPrompt = useCallback(() => setPromptExpanded(true), []);
   const setLocaleRu = useCallback(() => setSiteLocale("ru"), []);
   const setLocaleEn = useCallback(() => setSiteLocale("en"), []);
+  const setModeHtml = useCallback(() => setGenerateMode("html"), []);
+  const setModeTemplate = useCallback(() => setGenerateMode("template"), []);
   const onPromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value);
   }, []);
@@ -86,6 +117,19 @@ export default function Home() {
       transform: siteLocale === "en" ? "translateX(calc(100% + 0.25rem))" : "translateX(0)",
     }),
     [siteLocale],
+  );
+
+  const generateModeIndicatorStyle = useMemo(
+    () => ({
+      width: "calc(50% - 0.375rem)",
+      transform: generateMode === "template" ? "translateX(calc(100% + 0.25rem))" : "translateX(0)",
+    }),
+    [generateMode],
+  );
+
+  const promptFieldPlaceholder = useMemo(
+    () => promptPlaceholder[generateMode][siteLocale],
+    [generateMode, siteLocale],
   );
 
   useEffect(() => {
@@ -107,7 +151,7 @@ export default function Home() {
     setError(null);
     setLoading(true);
     try {
-      const data = await postGenerate(prompt.trim(), siteLocale);
+      const data = await postGenerate(prompt.trim(), siteLocale, { generateMode });
       navigate("/editor", { state: { data } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось создать");
@@ -155,7 +199,7 @@ export default function Home() {
             id="prompt-expanded"
             autoFocus
             className={`mt-3 min-h-0 flex-1 resize-none ${textareaClassName}`}
-            placeholder={descriptionHint[siteLocale]}
+            placeholder={promptFieldPlaceholder}
             value={prompt}
             onChange={onPromptChange}
             required
@@ -250,6 +294,46 @@ export default function Home() {
                   </div>
 
                   <div>
+                    <p className="mb-2 text-xs font-medium text-slate-500" id="gen-mode-label">
+                      {siteLocale === "ru" ? "Как собрать страницу" : "How to build"}
+                    </p>
+                    <p className="mb-2 text-left text-[0.65rem] leading-snug text-slate-600">
+                      {siteLocale === "ru"
+                        ? "ИИ — целый HTML от модели. Шаблон — готовые блоки сайта; модель подставляет тексты и выбирает тему оформления (цвета через skin)."
+                        : "AI — full HTML from the model. Template — our layout; the model fills copy and picks a visual skin (palette)."}
+                    </p>
+                    <div
+                      className="relative grid min-h-[48px] grid-cols-2 grid-rows-1 gap-1 rounded-xl border border-slate-700/80 bg-slate-900/70 p-1"
+                      role="group"
+                      aria-labelledby="gen-mode-label"
+                    >
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute top-1 bottom-1 left-1 z-0 rounded-lg bg-slate-800 shadow-md ring-1 ring-white/[0.06] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none"
+                        style={generateModeIndicatorStyle}
+                      />
+                      <button
+                        type="button"
+                        onClick={setModeHtml}
+                        className={`relative z-10 flex min-h-0 w-full items-center justify-center self-stretch rounded-lg px-2 text-sm font-medium leading-none transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/45 touch-action-manipulation ${
+                          generateMode === "html" ? "text-white" : "text-slate-400 hover:text-slate-300"
+                        }`}
+                      >
+                        {siteLocale === "ru" ? "ИИ" : "AI"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={setModeTemplate}
+                        className={`relative z-10 flex min-h-0 w-full items-center justify-center self-stretch rounded-lg px-2 text-sm font-medium leading-none transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/45 touch-action-manipulation ${
+                          generateMode === "template" ? "text-white" : "text-slate-400 hover:text-slate-300"
+                        }`}
+                      >
+                        {siteLocale === "ru" ? "Шаблон" : "Template"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
                     <div className="mb-1.5 flex items-end justify-between gap-2">
                       <label htmlFor="prompt" className="pb-0.5 text-xs font-medium text-slate-500">
                         Описание задачи
@@ -268,8 +352,8 @@ export default function Home() {
                       <textarea
                         id="prompt"
                         rows={6}
-                        className={`min-h-[11rem] max-h-[min(42dvh,17rem)] resize-none sm:min-h-[12rem] sm:max-h-[min(45dvh,19rem)] ${textareaClassName}`}
-                        placeholder={descriptionHint[siteLocale]}
+                        className={`resize-none ${promptTextareaSizeClass} ${textareaClassName}`}
+                        placeholder={promptFieldPlaceholder}
                         value={prompt}
                         onChange={onPromptChange}
                         required

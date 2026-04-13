@@ -34,8 +34,8 @@ export function resolveLlmProvider(): LlmProvider | "none" {
   if (forced === "gigachat") return hasGigaCreds() ? "gigachat" : "none";
   if (forced === "openai") return hasOpenaiCreds() ? "openai" : "none";
 
-  if (hasZaiCreds()) return "zai";
   if (hasGigaCreds()) return "gigachat";
+  if (hasZaiCreds()) return "zai";
   if (hasYandexCreds()) return "yandex";
   if (hasOpenaiCreds()) return "openai";
   return "none";

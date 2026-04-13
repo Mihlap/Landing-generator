@@ -51,6 +51,15 @@ describe("HTTP API", () => {
       expect(mockedGenerate).toHaveBeenCalledWith("стоматология", "ru", {});
     });
 
+    it("передаёт generateMode в generateLandingContent", async () => {
+      mockedGenerate.mockResolvedValueOnce(validLandingData);
+      await request(app)
+        .post("/generate")
+        .send({ prompt: "тест", locale: "ru", generateMode: "template" })
+        .expect(200);
+      expect(mockedGenerate).toHaveBeenCalledWith("тест", "ru", { generateMode: "template" });
+    });
+
     it("невалидный locale даёт en только если en, иначе ru", async () => {
       mockedGenerate.mockResolvedValueOnce(validLandingData);
       await request(app).post("/generate").send({ prompt: "x", locale: "xx" }).expect(200);

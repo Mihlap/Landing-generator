@@ -27,6 +27,14 @@ export function landingBuildMode(provider: LlmProvider | "none"): "template" | "
   return "template";
 }
 
+export function resolveLandingBuildMode(
+  provider: LlmProvider | "none",
+  explicit?: "html" | "template",
+): "html" | "template" {
+  if (explicit === "html" || explicit === "template") return explicit;
+  return landingBuildMode(provider);
+}
+
 function themedFallbackImage(templateId: TemplateId): string {
   const byTemplate: Record<TemplateId, string> = {
     auto: WIKIMEDIA_STATIC_FALLBACK_JPEG,

@@ -324,10 +324,15 @@ export function systemPrompt(locale: SiteLocale): string {
 - realestate — недвижимость, риелтор, продажа/аренда жилья
 - ecommerce — интернет-магазин, онлайн-продажи, каталог товаров
 
-Выбери skinId — целое число от 1 до 10 (визуальная тема/палитра; разные номера дают разное оформление).
-Выбери порядок секций sections — массив из имён блоков без повторов. Допустимые значения (в любом порядке, но логично для продаж):
-hero, benefits, services, pricing, reviews, process, faq, cta, footer
-Обязательно включи hero и footer. Не включай лишние блоки, если для них нет содержания.
+Выбери skinId — целое число от 1 до 10 как базовую светлую/тёмную сетку: 2 и 4 — тёмные; остальные — светлые. Если просят dark — 2 или 4.
+Если пользователь указал цвета, градиент фона или настроение палитры, тона — обязательно заполни объект theme (см. ниже): сервер применит их поверх skinId. Не рассчитывай только на skinId для «розовый», «голубой», «фирменный #…» — переноси это в theme.variables.
+Любые коды вида #RGB, #RRGGBB или #RRGGBBAA из текста пользователя скопируй в theme.variables буквально (как минимум первый в --lp-accent, второй при наличии — в --lp-page-bg или градиент --lp-hero-bg).
+Если указан шрифт (название семейства) — задай theme.fontFamily (стек CSS, например: 'Manrope', system-ui, sans-serif) и при необходимости theme.fontLinkHref — только URL вида https://fonts.googleapis.com/css2?family=...&display=swap .
+Допустимые ключи theme.variables (все опциональны): --lp-page-bg, --lp-page-fg, --lp-muted, --lp-surface, --lp-surface-alt, --lp-accent, --lp-accent-on, --lp-accent-soft, --lp-border, --lp-hero-bg. Значения: #hex, rgb/rgba, hsl или linear-gradient(...) без url().
+Выбери порядок секций sections — массив из имён блоков без повторов. Допустимые значения:
+hero, benefits, services, gallery, pricing, reviews, process, faq, map, cta, footer
+Обязательно включи hero и footer. Добавляй gallery, если нужны фото/галерея/изображения. Добавляй map, если упомянута карта, проезд или адрес на карте. Не включай gallery/map без запроса пользователя.
+В galleryItems только релевантные кадры под выбранный templateId (dental — стоматология/клиника, не автомобили; auto — авто/сервис и т.д.).
 
 Опционально sectionVariants: для ключей hero, services, reviews укажи "a" или "b" (вариант вёрстки секции).
 
@@ -335,14 +340,21 @@ hero, benefits, services, pricing, reviews, process, faq, cta, footer
 Формат:
 {
   "templateId": "одно из: dental, auto, repair, realestate, ecommerce",
-  "skinId": 3,
-  "sections": ["hero", "benefits", "services", "pricing", "reviews", "process", "faq", "cta", "footer"],
+  "skinId": 2,
+  "sections": ["hero", "benefits", "services", "gallery", "pricing", "reviews", "process", "faq", "map", "cta", "footer"],
   "sectionVariants": { "hero": "a", "services": "b", "reviews": "a" },
   "title": "короткий заголовок H1",
   "subtitle": "1-2 предложения ценности",
   "services": ["пункт 1", "пункт 2", "пункт 3"],
   "benefits": [
     { "title": "коротко", "text": "1 предложение пользы" }
+  ],
+  "galleryItems": [
+    { "src": "https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=720&q=75", "alt": "описание кадра по теме templateId" }
+  ],
+  "mapEmbedSrc": "https://yandex.ru/map-widget/v1/?ll=37.617635%2C55.755814&z=12",
+  "socialLinks": [
+    { "label": "Instagram", "href": "https://instagram.com/example" }
   ],
   "pricing": [
     { "name": "название плана", "price": "цена или «от …»", "bullets": ["условие", "ещё пункт"] }
@@ -357,10 +369,26 @@ hero, benefits, services, pricing, reviews, process, faq, cta, footer
     { "quote": "короткий отзыв", "author": "Имя, город" },
     { "quote": "короткий отзыв", "author": "Имя, город" }
   ],
-  "cta": "текст кнопки призыва к действию"
+  "cta": "текст кнопки призыва к действию",
+  "theme": {
+    "variables": {
+      "--lp-page-bg": "linear-gradient(180deg, #e0f2fe 0%, #ffffff 50%)",
+      "--lp-accent": "#0369a1",
+      "--lp-hero-bg": "linear-gradient(135deg, #dbeafe 0%, #f8fafc 100%)"
+    },
+    "fontFamily": "'Manrope', system-ui, sans-serif",
+    "fontLinkHref": "https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap"
+  }
 }
 
+Поле theme опционально; если пользователь просил цвета/шрифт — заполни его. Пустой theme не добавляй.
+Поля galleryItems, mapEmbedSrc и socialLinks опциональны; заполняй их, если это следует из описания пользователя.
+Для galleryItems — HTTPS с images.unsplash.com или upload.wikimedia.org, либо относительные URL /image?prompt=...&w=520&h=390 (сервер подберёт фото по промпту: сток, затем генерация).
+Для mapEmbedSrc — только встраиваемый URL: yandex.ru/map-widget/... или Google Maps (www.google.com/maps... / maps.google.com).
+Для socialLinks — только настоящие https-ссылки; иначе опусти ключ.
+
 Тексты короткие, без воды; bullets в pricing — до 5 строк на план; benefits до 6 карточек; processSteps до 6; faq до 8 пар.
+Массив pricing — до 12 позиций; если пользователь просит «не менее N» / «минимум N» цен, тарифов или пакетов — верни в pricing **не короче N** элементов (без пустых name/price).
 Поля services, benefits, pricing, process, отзывы и тон должны соответствовать templateId и описанию пользователя.
 ${langRule}`;
 }
