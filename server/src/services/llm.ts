@@ -1,4 +1,5 @@
 import https from "node:https";
+import { inspect } from "node:util";
 import GigaChat from "gigachat";
 
 const YANDEX_COMPLETION_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion";
@@ -6,6 +7,78 @@ const ZAI_COMPLETION_URL = "https://api.z.ai/api/paas/v4/chat/completions";
 const ZAI_CODING_COMPLETION_URL = "https://api.z.ai/api/coding/paas/v4/chat/completions";
 
 export type LlmProvider = "yandex" | "gigachat" | "openai" | "zai";
+
+function stringifyUnknownError(err: unknown): string {
+  const isUselessObjectString = (s: string): boolean => {
+    const t = s.trim();
+    return t === "[object Object]" || t === "Object object";
+  };
+
+  if (err instanceof Error && err.message?.trim() && !isUselessObjectString(err.message)) {
+    return err.message.trim();
+  }
+  if (typeof err === "string" && err.trim() && !isUselessObjectString(err)) return err.trim();
+  if (!err || typeof err !== "object") return String(err);
+
+  const asRecord = err as Record<string, unknown>;
+  const directMessage = asRecord.message;
+  if (typeof directMessage === "string" && directMessage.trim() && !isUselessObjectString(directMessage)) {
+    return directMessage.trim();
+  }
+
+  const nestedError = asRecord.error;
+  if (typeof nestedError === "string" && nestedError.trim() && !isUselessObjectString(nestedError)) {
+    return nestedError.trim();
+  }
+  if (nestedError && typeof nestedError === "object") {
+    const nr = nestedError as Record<string, unknown>;
+    if (typeof nr.message === "string" && nr.message.trim() && !isUselessObjectString(nr.message)) {
+      return nr.message.trim();
+    }
+    if (typeof nr.description === "string" && nr.description.trim() && !isUselessObjectString(nr.description)) {
+      return nr.description.trim();
+    }
+    if (typeof nr.detail === "string" && nr.detail.trim() && !isUselessObjectString(nr.detail)) {
+      return nr.detail.trim();
+    }
+  }
+
+  const response = asRecord.response;
+  if (response && typeof response === "object") {
+    const rr = response as Record<string, unknown>;
+    const status = rr.status;
+    const statusText = rr.statusText;
+    const data = rr.data;
+    const body =
+      typeof data === "string"
+        ? data
+        : data && typeof data === "object"
+          ? JSON.stringify(data)
+          : undefined;
+    const parts = [status, statusText, body].filter((x) => typeof x === "string" || typeof x === "number");
+    if (parts.length) return parts.join(" ");
+  }
+
+  const data = asRecord.data;
+  if (typeof data === "string" && data.trim() && !isUselessObjectString(data)) return data.trim();
+  if (data && typeof data === "object") {
+    try {
+      const json = JSON.stringify(data);
+      if (json && json !== "{}") return json;
+    } catch {
+    }
+  }
+
+  const maybeToString = String(err);
+  if (maybeToString && !isUselessObjectString(maybeToString)) return maybeToString;
+
+  try {
+    const json = JSON.stringify(err);
+    if (json && json !== "{}") return json;
+  } catch {
+  }
+  return inspect(err, { depth: 6, breakLength: 120, maxArrayLength: 30 });
+}
 
 function hasYandexCreds(): boolean {
   const folder = process.env.YANDEX_CLOUD_FOLDER_ID?.trim();
@@ -30,8 +103,8 @@ export function resolveLlmProvider(): LlmProvider | "none" {
   const forced = process.env.AI_PROVIDER?.toLowerCase().trim();
 
   if (forced === "zai" || forced === "z.ai") return hasZaiCreds() ? "zai" : "none";
-  if (forced === "yandex") return hasYandexCreds() ? "yandex" : "none";
   if (forced === "gigachat") return hasGigaCreds() ? "gigachat" : "none";
+  if (forced === "yandex") return hasYandexCreds() ? "yandex" : "none";
   if (forced === "openai") return hasOpenaiCreds() ? "openai" : "none";
 
   if (hasGigaCreds()) return "gigachat";
@@ -108,14 +181,24 @@ async function completeGigachat(
     timeout: 180,
   });
 
-  const completion = await client.chat({
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-    temperature: 0.6,
-    ...(opts?.maxTokens ? { max_tokens: opts.maxTokens } : {}),
-  });
+  let completion:
+    | {
+        choices?: { message?: { content?: string } }[];
+      }
+    | undefined;
+  try {
+    completion = await client.chat({
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      temperature: 0.6,
+      ...(opts?.maxTokens ? { max_tokens: opts.maxTokens } : {}),
+    });
+  } catch (err) {
+    const details = stringifyUnknownError(err).slice(0, 600);
+    throw new Error(`GigaChat request failed: ${details}`);
+  }
 
   const text = completion.choices?.[0]?.message?.content?.trim() ?? "";
   if (!text) throw new Error("GigaChat: пустой ответ модели");

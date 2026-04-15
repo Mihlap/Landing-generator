@@ -857,11 +857,7 @@ ${prompt}
       );
     }
 
-    throw new Error(
-      locale === "ru"
-        ? `Ошибка ИИ (${provider}): ${errText.slice(0, 600)}`
-        : `LLM error (${provider}): ${errText.slice(0, 600)}`,
-    );
+    throw new Error(locale === "ru" ? `Ошибка ИИ (${provider})` : `LLM error (${provider})`);
   }
 
   const parsed = parseJson(text, locale, prompt);

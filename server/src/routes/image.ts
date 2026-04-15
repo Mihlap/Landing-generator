@@ -10,7 +10,7 @@ import {
 import { fetchStockImageUrl, stockSearchConfigured } from "../services/stockImageSearch.js";
 
 const router = Router();
-const IMAGE_TIMEOUT_MS = 12_000;
+const IMAGE_TIMEOUT_MS = 8_000;
 
 function parseStockApiTimeoutMs(): number {
   const raw = process.env.IMAGE_STOCK_API_TIMEOUT_MS?.trim();
