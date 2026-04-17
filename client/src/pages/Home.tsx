@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { postGenerate } from "../api/generate";
 import type { LandingGenerateMode, SiteLocale } from "../types";
@@ -91,6 +91,74 @@ const textareaClassName =
 
 const promptTextareaSizeClass =
   "min-h-[11rem] max-h-[min(42dvh,17rem)] sm:min-h-[12rem] sm:max-h-[min(45dvh,19rem)]";
+
+const LOCALE_TEXT_FADE_MS = 340;
+
+type AnimatedLocaleTextProps = {
+  text: string;
+  locale: SiteLocale;
+  className?: string;
+};
+
+const AnimatedLocaleText = memo(function AnimatedLocaleText({
+  text,
+  locale: _locale,
+  className,
+}: AnimatedLocaleTextProps) {
+  const [currentText, setCurrentText] = useState(text);
+  const [prevText, setPrevText] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const clearPrevTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (currentText === text) return;
+    if (clearPrevTimeoutRef.current) window.clearTimeout(clearPrevTimeoutRef.current);
+
+    setPrevText(currentText);
+    setCurrentText(text);
+    setIsAnimating(false);
+
+    const frameId = window.requestAnimationFrame(() => setIsAnimating(true));
+    clearPrevTimeoutRef.current = window.setTimeout(() => {
+      setPrevText(null);
+      setIsAnimating(false);
+      clearPrevTimeoutRef.current = null;
+    }, LOCALE_TEXT_FADE_MS);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [currentText, text]);
+
+  useEffect(
+    () => () => {
+      if (clearPrevTimeoutRef.current) window.clearTimeout(clearPrevTimeoutRef.current);
+    },
+    [],
+  );
+
+  return (
+    <span className={`relative grid ${className ?? ""}`} aria-live="polite">
+      {prevText ? (
+        <span
+          className={`pointer-events-none [grid-area:1/1] break-words transition-opacity ease-out motion-reduce:transition-none ${
+            isAnimating ? "opacity-0" : "opacity-100"
+          }`}
+          style={{ transitionDuration: `${LOCALE_TEXT_FADE_MS}ms` }}
+          aria-hidden
+        >
+          {prevText}
+        </span>
+      ) : null}
+      <span
+        className={`[grid-area:1/1] break-words transition-opacity ease-out motion-reduce:transition-none ${
+          isAnimating ? "opacity-100" : prevText ? "opacity-0" : "opacity-100"
+        }`}
+        style={{ transitionDuration: `${LOCALE_TEXT_FADE_MS}ms` }}
+      >
+        {currentText}
+      </span>
+    </span>
+  );
+});
 
 export default function Home() {
   const navigate = useNavigate();
@@ -251,18 +319,29 @@ export default function Home() {
               />
               <div className="relative">
                 <p className="mb-1 text-left text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {siteLocale === "ru" ? "Новый макет" : "New layout"}
+                  <AnimatedLocaleText
+                    locale={siteLocale}
+                    text={siteLocale === "ru" ? "Новый макет" : "New layout"}
+                  />
                 </p>
                 <p className="mb-5 text-left text-xs leading-snug text-slate-600">
-                  {siteLocale === "ru"
-                    ? "Один запрос — черновик в редакторе с предпросмотром"
-                    : "One request — draft in the editor with live preview"}
+                  <AnimatedLocaleText
+                    locale={siteLocale}
+                    text={
+                      siteLocale === "ru"
+                        ? "Один запрос — черновик в редакторе с предпросмотром"
+                        : "One request — draft in the editor with live preview"
+                    }
+                  />
                 </p>
 
                 <form onSubmit={onSubmit} className="space-y-5">
                   <div>
                     <p className="mb-2 text-xs font-medium text-slate-500" id="site-lang-label">
-                      {siteLocale === "ru" ? "Язык страницы" : "Page language"}
+                      <AnimatedLocaleText
+                        locale={siteLocale}
+                        text={siteLocale === "ru" ? "Язык страницы" : "Page language"}
+                      />
                     </p>
                     <div
                       className="relative grid min-h-[48px] grid-cols-2 grid-rows-1 gap-1 rounded-xl border border-slate-700/80 bg-slate-900/70 p-1"
@@ -297,12 +376,20 @@ export default function Home() {
 
                   <div>
                     <p className="mb-2 text-xs font-medium text-slate-500" id="gen-mode-label">
-                      {siteLocale === "ru" ? "Как собрать страницу" : "How to build"}
+                      <AnimatedLocaleText
+                        locale={siteLocale}
+                        text={siteLocale === "ru" ? "Как собрать страницу" : "How to build"}
+                      />
                     </p>
                     <p className="mb-2 text-left text-[0.65rem] leading-snug text-slate-600">
-                      {siteLocale === "ru"
-                        ? "ИИ — полноценный HTML с готовым визуалом от модели. Шаблон — проверенные блоки сайта: модель подставляет тексты и подбирает более выразительную тему оформления."
-                        : "AI — complete HTML with polished visuals from the model. Template — proven site blocks; the model fills the copy and selects a more vivid visual skin (palette)."}
+                      <AnimatedLocaleText
+                        locale={siteLocale}
+                        text={
+                          siteLocale === "ru"
+                            ? "ИИ — полноценный HTML с готовым визуалом от модели. Шаблон — проверенные блоки сайта: модель подставляет тексты и подбирает более выразительную тему оформления."
+                            : "AI — complete HTML with polished visuals from the model. Template — proven site blocks; the model fills the copy and selects a more vivid visual skin (palette)."
+                        }
+                      />
                     </p>
                     <div
                       className="relative grid min-h-[48px] grid-cols-2 grid-rows-1 gap-1 rounded-xl border border-slate-700/80 bg-slate-900/70 p-1"
@@ -321,7 +408,7 @@ export default function Home() {
                           generateMode === "html" ? "text-white" : "text-slate-400 hover:text-slate-300"
                         }`}
                       >
-                        {siteLocale === "ru" ? "ИИ" : "AI"}
+                        <AnimatedLocaleText locale={siteLocale} text={siteLocale === "ru" ? "ИИ" : "AI"} />
                       </button>
                       <button
                         type="button"
@@ -330,7 +417,10 @@ export default function Home() {
                           generateMode === "template" ? "text-white" : "text-slate-400 hover:text-slate-300"
                         }`}
                       >
-                        {siteLocale === "ru" ? "Шаблон" : "Template"}
+                        <AnimatedLocaleText
+                          locale={siteLocale}
+                          text={siteLocale === "ru" ? "Шаблон" : "Template"}
+                        />
                       </button>
                     </div>
                   </div>
@@ -338,7 +428,10 @@ export default function Home() {
                   <div>
                     <div className="mb-1.5 flex items-end justify-between gap-2">
                       <label htmlFor="prompt" className="pb-0.5 text-xs font-medium text-slate-500">
-                        {siteLocale === "ru" ? "Описание задачи" : "Task description"}
+                        <AnimatedLocaleText
+                          locale={siteLocale}
+                          text={siteLocale === "ru" ? "Описание задачи" : "Task description"}
+                        />
                       </label>
                       <button
                         type="button"
@@ -375,18 +468,28 @@ export default function Home() {
                       disabled={loading || !prompt.trim()}
                       className="inline-flex min-h-[48px] w-full items-center justify-center px-4 text-center text-[0.9375rem] font-semibold leading-tight text-white touch-action-manipulation rounded-xl bg-indigo-600 py-3 shadow-lg shadow-indigo-950/45 transition hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50"
                     >
-                      {loading
-                        ? siteLocale === "ru"
-                          ? "Собираем страницу…"
-                          : "Building page…"
-                        : siteLocale === "ru"
-                          ? "Собрать страницу"
-                          : "Build page"}
+                      <AnimatedLocaleText
+                        locale={siteLocale}
+                        text={
+                          loading
+                            ? siteLocale === "ru"
+                              ? "Собираем страницу…"
+                              : "Building page…"
+                            : siteLocale === "ru"
+                              ? "Собрать страницу"
+                              : "Build page"
+                        }
+                      />
                     </button>
                     <p className="mt-4 text-pretty text-left text-xs font-medium leading-relaxed text-slate-400 sm:text-[0.7rem]">
-                      {siteLocale === "ru"
-                        ? "Регистрация не нужна — только описание и черновик в редакторе"
-                        : "No signup needed — just your prompt and a draft in the editor"}
+                      <AnimatedLocaleText
+                        locale={siteLocale}
+                        text={
+                          siteLocale === "ru"
+                            ? "Регистрация не нужна — только описание и черновик в редакторе"
+                            : "No signup needed — just your prompt and a draft in the editor"
+                        }
+                      />
                     </p>
                   </div>
                 </form>
