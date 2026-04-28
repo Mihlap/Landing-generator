@@ -8,7 +8,6 @@ import {
 const HEX_IN_TEXT =
   /#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g;
 
-/** Пары [регекс для промпта, #RRGGBB] — если в тексте нет HEX, подставляем оттенки по словам. */
 const NAMED_COLOR_HINTS: { re: RegExp; hex: string }[] = [
   { re: /бордов|бордо|bordo|burgundy/i, hex: "#722f37" },
   { re: /золот|золотист|gold/i, hex: "#c5a059" },
@@ -84,7 +83,6 @@ function safeHexCss(g: string | undefined): string | undefined {
   return sanitizeLandingThemeCssValue(norm) ?? undefined;
 }
 
-/** Подписи «фон #…», «кнопки #…» — чтобы не путать порядок цветов. */
 function extractLabeledHexColors(prompt: string): { pageBg?: string; accent?: string } {
   const out: { pageBg?: string; accent?: string } = {};
   const bg = prompt.match(/(?:фон|фона|background)\s*[:\s—–-]*\s*(#[0-9a-fA-F]{3,8})\b/i);
@@ -98,9 +96,6 @@ function extractLabeledHexColors(prompt: string): { pageBg?: string; accent?: st
   return out;
 }
 
-/**
- * Строит theme.variables из явных #hex и названий цветов в промпте (если модель их не перенесла в JSON).
- */
 export function inferThemeVariablesFromPrompt(prompt: string): Partial<Record<LandingThemeVarKey, string>> {
   const labeled = extractLabeledHexColors(prompt);
   const allHex = extractHexColorsFromPrompt(prompt);
@@ -166,10 +161,6 @@ export function inferThemeVariablesFromPrompt(prompt: string): Partial<Record<La
   return out;
 }
 
-/**
- * Объединяет theme из модели с палитрой из текста запроса.
- * Явные #hex и названия цветов в промпте перекрывают одноимённые ключи в theme.variables у модели (частая ошибка ИИ).
- */
 export function mergeThemeWithPromptColors(coreTheme: unknown, prompt: string): LandingTheme | undefined {
   const model = sanitizeLandingTheme(coreTheme);
   const inferred = inferThemeVariablesFromPrompt(prompt);

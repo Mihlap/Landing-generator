@@ -7,7 +7,6 @@ type AltPair = { altRu: string; altEn: string };
 
 type SeedBundle = { seeds: string[]; labels: AltPair[] };
 
-/** Англоязычные запросы — лучше находят релевантные снимки в Wikimedia Commons API. */
 const BUNDLES: Record<TemplateId, SeedBundle> = {
   dental: {
     seeds: [
@@ -110,10 +109,6 @@ function mergeSeed(seed: string, ctx: string): string {
 
 export type GalleryPoolLocale = "ru" | "en";
 
-/**
- * Пул картинок для шаблона: URL вида /image?… — сервер сначала ищет сток (Commons/Openverse),
- * при неудаче — курируемый Unsplash и затем настроенный ИИ‑провайдер (Doubao / Pollinations).
- */
 export function buildTemplateGalleryPool(
   templateId: TemplateId,
   locale: GalleryPoolLocale,
@@ -135,7 +130,6 @@ export function buildTemplateGalleryPool(
   return out;
 }
 
-/** Идентификаторы фото Unsplash (без префикса photo-) — для отсечения чужих стоков из ответа модели. */
 export const REFERENCE_UNSPLASH_PHOTO_IDS_BY_TEMPLATE: Record<TemplateId, readonly string[]> = {
   auto: ["1486262715619-567beee29d4f", "1503376780353-7e6692767b70", "1558618666-fcd25c85cd64", "1492144534655-ae79c964c9d7"],
   dental: ["1606811841689-23dfddce3e95", "1629909613654-28e377c37b09", "1588776814546-1ffcf47267a5", "1609840114035-3c981b782dfe"],
