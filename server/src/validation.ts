@@ -1,5 +1,6 @@
 import type { LandingData, SiteLocale } from "./services/ai.js";
 import { isSectionKind } from "./services/ai.js";
+import { isLandingPreset, type LandingPreset } from "./services/landingPreset.js";
 import { LANDING_THEME_VARIABLE_KEYS } from "./landingTheme.js";
 import type { LandingLayoutMode } from "./services/landingHtmlPostprocess.js";
 import { isTemplateId } from "./templateId.js";
@@ -16,6 +17,10 @@ export function isLandingLayoutMode(x: unknown): x is LandingLayoutMode {
 
 export function isLandingGenerateMode(x: unknown): x is "html" | "template" {
   return x === "html" || x === "template";
+}
+
+export function isLandingPresetMode(x: unknown): x is LandingPreset {
+  return isLandingPreset(x);
 }
 
 function isLandingTheme(x: unknown): boolean {

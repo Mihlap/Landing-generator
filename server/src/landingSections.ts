@@ -57,9 +57,9 @@ const BASE_STYLE = `
     min-width: 0;
   }
   .lp-prose {
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    hyphens: auto;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
   }
   .lp-prose h1, .lp-prose h2, .lp-prose h3, .lp-prose p, .lp-prose li {
     min-width: 0;
@@ -286,6 +286,36 @@ const BASE_STYLE = `
     background: var(--lp-surface-alt);
   }
   .lp-footer-tagline { margin: 0 0 0.75rem; color: var(--lp-page-fg); }
+  .lp-footer-address {
+    margin: 0.5rem 0 0;
+    color: var(--lp-page-fg);
+    font-style: normal;
+    line-height: 1.55;
+  }
+  .lp-footer-contacts {
+    display: grid;
+    gap: 0.35rem;
+    justify-items: center;
+    margin-top: 0.35rem;
+  }
+  .lp-footer-contact-line {
+    margin: 0;
+    color: var(--lp-page-fg);
+    line-height: 1.5;
+  }
+  .lp-footer-contact-label {
+    color: var(--lp-muted);
+    font-weight: 600;
+    margin-right: 0.35rem;
+  }
+  .lp-footer-phone {
+    display: inline-block;
+    margin-top: 0.35rem;
+    color: var(--lp-accent);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .lp-footer-phone:hover { text-decoration: underline; }
   .lp-footer-social {
     display: flex;
     flex-wrap: wrap;
@@ -606,7 +636,7 @@ function galleryImageOriginForPreconnect(src: string): string | undefined {
     const u = new URL(src.trim());
     if (u.protocol !== "https:") return undefined;
     const h = u.hostname.toLowerCase();
-    if (h === "images.unsplash.com" || h === "upload.wikimedia.org") {
+    if (h === "images.unsplash.com") {
       return `https://${h}`;
     }
   } catch {
@@ -695,7 +725,7 @@ function renderServices(data: LandingData, H: Headings): string {
 }
 
 function renderGallery(data: LandingData, H: Headings): string {
-  const items = data.galleryItems?.length ? data.galleryItems.slice(0, 8) : [];
+  const items = data.galleryItems?.length ? data.galleryItems.slice(0, 12) : [];
   if (!items.length) return "";
   const sizes =
     "(max-width: 639px) calc(100vw - 2rem), (max-width: 959px) calc(50vw - 1.25rem), min(520px, calc(25vw - 1rem))";
@@ -817,8 +847,25 @@ function renderFooter(data: LandingData, H: Headings): string {
     })
     .join("");
   const social = links ? `<div class="lp-footer-social">${links}</div>` : "";
+  const contactRequested = Boolean(data.contactRequested);
+  const addrValue = data.contactAddress?.trim() || (data.locale === "ru" ? "не указан" : "not specified");
+  const phoneValue = data.contactPhone?.trim() || (data.locale === "ru" ? "не указан" : "not specified");
+  const address = contactRequested
+    ? `<p class="lp-footer-contact-line"><span class="lp-footer-contact-label">${data.locale === "ru" ? "Адрес:" : "Address:"}</span>${escapeHtml(addrValue)}</p>`
+    : data.contactAddress?.trim()
+      ? `<address class="lp-footer-address">${escapeHtml(data.contactAddress.trim())}</address>`
+      : "";
+  const phone = contactRequested
+    ? data.contactPhone?.trim()
+      ? `<p class="lp-footer-contact-line"><span class="lp-footer-contact-label">${data.locale === "ru" ? "Телефон:" : "Phone:"}</span><a class="lp-footer-phone" href="tel:${escapeHtml(data.contactPhone.replace(/[^\d+]/g, ""))}">${escapeHtml(data.contactPhone.trim())}</a></p>`
+      : `<p class="lp-footer-contact-line"><span class="lp-footer-contact-label">${data.locale === "ru" ? "Телефон:" : "Phone:"}</span>${escapeHtml(phoneValue)}</p>`
+    : data.contactPhone?.trim()
+      ? `<a class="lp-footer-phone" href="tel:${escapeHtml(data.contactPhone.replace(/[^\d+]/g, ""))}">${escapeHtml(data.contactPhone.trim())}</a>`
+      : "";
+  const contactsBlock = address || phone ? `<div class="lp-footer-contacts">${address}${phone}</div>` : "";
   return `<footer class="lp-footer lp-prose" id="contact">
     <p class="lp-footer-tagline">${escapeHtml(H.footer)}</p>
+    ${contactsBlock}
     ${social}
   </footer>`;
 }

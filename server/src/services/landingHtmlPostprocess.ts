@@ -31,7 +31,6 @@ import {
   computeLandingImageSeed,
   FALLBACK_IMAGE_SRC,
   replaceStockImagesWithAi,
-  shouldReplaceStockWithAi,
 } from "./landingHtmlPostprocessImageUrl.js";
 import {
   ensureAtLeastOneHeroImage,
@@ -46,6 +45,7 @@ import {
   normalizeHeroHeadingSurface,
   rewriteInternalLinksToAnchors,
   sanitizeInlineCssDataUrls,
+  stripInlineSvg,
   stripUnsafeHrefs,
 } from "./landingHtmlPostprocessMutations.js";
 
@@ -76,7 +76,11 @@ export function enhanceLandingHtml(
   const landingSeed = computeLandingImageSeed(html);
 
   const withLayoutWidths = normalizeLayoutWidths(replaceCanonicalSocialSvgInAnchors(stripUnsafeHrefs(html)));
-  const withSanitizedCssDataUrls = sanitizeInlineCssDataUrls(withLayoutWidths);
+  const withSvgPolicyApplied =
+    process.env.LANDING_ALLOW_INLINE_SVG?.trim().toLowerCase() === "true"
+      ? withLayoutWidths
+      : stripInlineSvg(withLayoutWidths);
+  const withSanitizedCssDataUrls = sanitizeInlineCssDataUrls(withSvgPolicyApplied);
   const withSafeBgImages = ensureBackgroundImagesHaveSource(withSanitizedCssDataUrls);
   const withSafeImages = ensureImageTagsHaveSource(withSafeBgImages);
   const withFixedSectionAnchors = fixIncompleteSectionAnchors(withSafeImages);
@@ -87,9 +91,7 @@ export function enhanceLandingHtml(
   const withHeroImage = skipVisual
     ? withHeroTitleFix
     : ensureAtLeastOneHeroImage(withHeroTitleFix, fallbackImageSrc, imagePreference);
-  const withAiImages = shouldReplaceStockWithAi()
-    ? replaceStockImagesWithAi(withHeroImage, imagePreference)
-    : withHeroImage;
+  const withAiImages = replaceStockImagesWithAi(withHeroImage, imagePreference);
   const withVisualCoverage = skipVisual ? withAiImages : ensureVisualCoverage(withAiImages, imagePreference);
   const withImageSlots = assignVariationSlotsToLocalImages(withVisualCoverage);
   const withLandingSid = appendLandingSidToLocalImages(withImageSlots, landingSeed);

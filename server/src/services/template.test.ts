@@ -97,6 +97,32 @@ describe("renderTemplate", () => {
     expect(html).toContain('aria-label="TG"');
   });
 
+  it("рендерит адрес в контактах", () => {
+    const html = renderTemplate("ecommerce", {
+      ...validLandingData,
+      templateId: "ecommerce",
+      sections: ["hero", "footer"],
+      contactAddress: "Москва, ул. Тверская, 7",
+      contactPhone: "+7 (999) 123-45-67",
+    });
+    expect(html).toContain("lp-footer-address");
+    expect(html).toContain("Москва, ул. Тверская, 7");
+    expect(html).toContain("lp-footer-phone");
+    expect(html).toContain("+7 (999) 123-45-67");
+  });
+
+  it("при contactRequested всегда показывает подписи адреса и телефона", () => {
+    const html = renderTemplate("ecommerce", {
+      ...validLandingData,
+      templateId: "ecommerce",
+      sections: ["hero", "footer"],
+      contactRequested: true,
+    });
+    expect(html).toContain("Адрес:");
+    expect(html).toContain("Телефон:");
+    expect(html).toContain("не указан");
+  });
+
   it("подключает theme: переменные, шрифт и Google Fonts link", () => {
     const html = renderTemplate("dental", {
       ...validLandingData,

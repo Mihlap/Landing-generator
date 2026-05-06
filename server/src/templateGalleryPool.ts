@@ -26,14 +26,18 @@ const BUNDLES: Record<TemplateId, SeedBundle> = {
     seeds: [
       "auto repair workshop garage interior",
       "car mechanic vehicle service bay",
-      "motorcycle workshop maintenance",
       "car diagnostic service professional",
+      "wheel alignment service station",
+      "engine repair close up professional mechanic",
+      "car wash detailing service clean vehicle",
     ],
     labels: [
       { altRu: "Работа в автосервисе", altEn: "Auto workshop" },
-      { altRu: "Автомобиль", altEn: "Car" },
-      { altRu: "Мототехника", altEn: "Motorcycle" },
-      { altRu: "Сервис и обслуживание", altEn: "Service bay" },
+      { altRu: "Ремонт автомобиля", altEn: "Car repair" },
+      { altRu: "Диагностика", altEn: "Diagnostics" },
+      { altRu: "Развал-схождение", altEn: "Wheel alignment" },
+      { altRu: "Ремонт двигателя", altEn: "Engine service" },
+      { altRu: "Детейлинг и мойка", altEn: "Car detailing" },
     ],
   },
   repair: {
@@ -96,15 +100,29 @@ const BEAUTY_BUNDLE: SeedBundle = {
 };
 
 function compactContext(userPrompt: string): string {
-  const t = userPrompt.replace(/\s+/g, " ").trim();
-  if (!t) return "";
-  return t.length > 120 ? `${t.slice(0, 120)}…` : t;
+  const normalized = userPrompt.replace(/\s+/g, " ").trim().toLowerCase();
+  if (!normalized) return "";
+  
+  const cleaned = normalized
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .replace(
+      /\b(html|css|js|javascript|лендинг|сайт|страниц[аы]|секци[яи]|адаптив|шрифт|цвет|блок|кнопк[аи]|ui|ux)\b/giu,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) return "";
+  const words = cleaned.split(" ").filter(Boolean);
+  if (words.length > 10) return "";
+  return words.slice(0, 6).join(" ");
 }
 
-function mergeSeed(seed: string, ctx: string): string {
+function mergeSeed(seed: string, subject: string, ctx: string): string {
   const c = ctx.trim();
-  if (!c) return seed;
-  return `${seed}. ${c}`;
+  const base = `${seed}. subject: ${subject}`;
+  if (!c) return base;
+  return `${base}. context: ${c}`;
 }
 
 export type GalleryPoolLocale = "ru" | "en";
@@ -120,20 +138,14 @@ export function buildTemplateGalleryPool(
   const n = Math.min(bundle.seeds.length, bundle.labels.length);
   const out: { src: string; altRu: string; altEn: string }[] = [];
   for (let i = 0; i < n; i++) {
-    const prompt = mergeSeed(bundle.seeds[i]!, ctx);
+    const label = bundle.labels[i]!;
+    const prompt = mergeSeed(bundle.seeds[i]!, label.altEn, ctx);
     out.push({
-      src: toLocalImageUrl(prompt, GALLERY_IMG_SIZE, "stock_first", i),
-      altRu: bundle.labels[i]!.altRu,
-      altEn: bundle.labels[i]!.altEn,
+      src: toLocalImageUrl(prompt, GALLERY_IMG_SIZE, "gen_first", i),
+      altRu: label.altRu,
+      altEn: label.altEn,
     });
   }
   return out;
 }
 
-export const REFERENCE_UNSPLASH_PHOTO_IDS_BY_TEMPLATE: Record<TemplateId, readonly string[]> = {
-  auto: ["1486262715619-567beee29d4f", "1503376780353-7e6692767b70", "1558618666-fcd25c85cd64", "1492144534655-ae79c964c9d7"],
-  dental: ["1606811841689-23dfddce3e95", "1629909613654-28e377c37b09", "1588776814546-1ffcf47267a5", "1609840114035-3c981b782dfe"],
-  repair: ["1581578731548-c64695cc6952", "1504148455328-c376907d581c", "1621905252507-b35492cc74b4", "1581244277943-fe4a9c777189"],
-  realestate: ["1560518883-ce09059eeffa", "1512917774080-9991f1c4c750", "1600596542815-ffad4c1539a9", "1600585154340-be6161a56a0c"],
-  ecommerce: ["1472851294608-062f824d29cc", "1607082349566-187342175e2f", "1556742049-0cfed4f6a45d", "1441986300917-64674bd600d8"],
-};

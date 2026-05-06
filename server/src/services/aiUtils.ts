@@ -1,6 +1,5 @@
 import type { TemplateId } from "../templateId.js";
 import type { LlmProvider } from "./llm.js";
-import { WIKIMEDIA_ALT_FALLBACK_JPEG, WIKIMEDIA_STATIC_FALLBACK_JPEG } from "./imageGen.js";
 
 type SiteLocale = "ru" | "en";
 
@@ -35,45 +34,49 @@ export function resolveLandingBuildMode(
   return landingBuildMode(provider);
 }
 
+function localGeneratedImageUrl(prompt: string, width = 1280, height = 720): string {
+  return `/image?prompt=${encodeURIComponent(prompt.trim().slice(0, 600))}&w=${width}&h=${height}&prefer=gen`;
+}
+
 function themedFallbackImage(templateId: TemplateId): string {
   const byTemplate: Record<TemplateId, string> = {
-    auto: WIKIMEDIA_STATIC_FALLBACK_JPEG,
-    dental: WIKIMEDIA_ALT_FALLBACK_JPEG,
-    repair: WIKIMEDIA_STATIC_FALLBACK_JPEG,
-    realestate: WIKIMEDIA_ALT_FALLBACK_JPEG,
-    ecommerce: WIKIMEDIA_STATIC_FALLBACK_JPEG,
+    auto: "modern auto service workshop landing page hero image",
+    dental: "modern dental clinic landing page hero image",
+    repair: "professional home repair service landing page hero image",
+    realestate: "premium real estate realtor landing page hero image",
+    ecommerce: "modern online store ecommerce landing page hero image",
   };
-  return byTemplate[templateId];
+  return localGeneratedImageUrl(byTemplate[templateId]);
 }
 
 export function themedFallbackImageByPrompt(prompt: string, templateId: TemplateId): string {
   const p = prompt.toLowerCase();
   if (/авто|машин|шиномонтаж|автосервис|car|auto/i.test(p)) {
-    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
+    return localGeneratedImageUrl("modern auto service workshop, professional website hero image");
   }
   if (/стоматолог|зуб|dentist|dental/i.test(p)) {
-    return WIKIMEDIA_ALT_FALLBACK_JPEG;
+    return localGeneratedImageUrl("modern dental clinic interior, professional website hero image");
   }
   if (/недвижим|риелтор|real\s*estate|property|квартир|дом/i.test(p)) {
-    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
+    return localGeneratedImageUrl("premium real estate agent, bright apartment interior, website hero image");
   }
   if (/магазин|товар|каталог|ecommerce|online\s*store|shop/i.test(p)) {
-    return WIKIMEDIA_ALT_FALLBACK_JPEG;
+    return localGeneratedImageUrl("modern ecommerce online store products, website hero image");
   }
   if (/парикмахер|паркмахер|барбер|салон\s*красоты|hair|barber|beauty/i.test(p)) {
-    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
+    return localGeneratedImageUrl("modern beauty salon or barbershop, professional website hero image");
   }
   if (/тюльпан|цветы|букет|флорист|flower|tulip|bouquet|florist/i.test(p)) {
-    return WIKIMEDIA_ALT_FALLBACK_JPEG;
+    return localGeneratedImageUrl("premium florist bouquet, elegant website hero image");
   }
   if (/ремонт|мастер|handyman|сантехник|электрик|repair/i.test(p)) {
-    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
+    return localGeneratedImageUrl("professional handyman repair service, website hero image");
   }
   if (/курс|обучение|школ|education|course/i.test(p)) {
-    return WIKIMEDIA_ALT_FALLBACK_JPEG;
+    return localGeneratedImageUrl("modern education course classroom, website hero image");
   }
   if (templateId === "auto") {
-    return WIKIMEDIA_STATIC_FALLBACK_JPEG;
+    return localGeneratedImageUrl("modern auto service workshop landing page hero image");
   }
   return themedFallbackImage(templateId);
 }

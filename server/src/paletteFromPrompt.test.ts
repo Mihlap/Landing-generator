@@ -39,6 +39,12 @@ describe("inferThemeVariablesFromPrompt", () => {
     const v = inferThemeVariablesFromPrompt("интернет-магазин в бордовых тонах");
     expect(v["--lp-accent"]).toBe("#722f37");
   });
+
+  it("подхватывает оранжевые тона без hex", () => {
+    const v = inferThemeVariablesFromPrompt("стоматология в оранжевых тонах");
+    expect(v["--lp-accent"]).toBe("#f97316");
+    expect(v["--lp-page-bg"]).toContain("#f97316");
+  });
 });
 
 describe("mergeThemeWithPromptColors", () => {
@@ -54,5 +60,17 @@ describe("mergeThemeWithPromptColors", () => {
     );
     expect(t?.variables?.["--lp-accent"]).toBe("#7c3aed");
     expect(t?.variables?.["--lp-page-bg"]).toBe("#faf5ff");
+  });
+
+  it("подхватывает шрифт из промпта даже без theme от модели", () => {
+    const t = mergeThemeWithPromptColors(undefined, "лендинг для риелтора в красных тонах, шрифт Montserrat");
+    expect(t?.fontFamily).toContain("Montserrat");
+    expect(t?.fontLinkHref).toContain("fonts.googleapis.com");
+  });
+
+  it("подхватывает арабский необычный шрифт", () => {
+    const t = mergeThemeWithPromptColors(undefined, "арабским необычным шрифтом");
+    expect(t?.fontFamily).toContain("El Messiri");
+    expect(t?.fontLinkHref).toContain("El+Messiri");
   });
 });

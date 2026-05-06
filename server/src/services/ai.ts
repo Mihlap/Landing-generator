@@ -1,10 +1,11 @@
 import { getLandingCompositionDefaults } from "../landingCompositionDefaults.js";
 import { sanitizeLandingTheme, type LandingTheme } from "../landingTheme.js";
 import { mergeThemeWithPromptColors } from "../paletteFromPrompt.js";
-import { buildTemplateGalleryPool, REFERENCE_UNSPLASH_PHOTO_IDS_BY_TEMPLATE } from "../templateGalleryPool.js";
+import { buildTemplateGalleryPool } from "../templateGalleryPool.js";
 import { isTemplateId, type TemplateId } from "../templateId.js";
 import type { EnhanceLandingHtmlOptions } from "./landingHtmlPostprocess.js";
 import { enhanceLandingHtml } from "./landingHtmlPostprocess.js";
+import { toLocalImageUrl } from "./landingHtmlPostprocessImageUrl.js";
 import { repairLandingHtml, validateLandingHtml } from "./landingHtmlValidate.js";
 import { type LlmProvider, resolveLlmProvider, runLlmCompletion, runLlmLandingHtml } from "./llm.js";
 import { analyzePrompt, buildEnrichedUserMessage } from "./aiContext.js";
@@ -26,6 +27,7 @@ export type { LandingTheme } from "../landingTheme.js";
 
 export type GenerateLandingOptions = EnhanceLandingHtmlOptions & {
   generateMode?: "html" | "template";
+  signal?: AbortSignal;
 };
 
 export type SiteLocale = "ru" | "en";
@@ -131,6 +133,10 @@ function promptWantsGallery(prompt: string): boolean {
   );
 }
 
+function promptWantsContacts(prompt: string): boolean {
+  return /контакт|contacts?|телефон|phone|адрес|address|\bтел\.?\b/i.test(prompt.toLowerCase());
+}
+
 function ensureSectionsForPrompt(prompt: string, sections: SectionKind[]): SectionKind[] {
   const out = [...sections];
   const insertBefore = (kind: SectionKind, pivot: SectionKind) => {
@@ -139,15 +145,21 @@ function ensureSectionsForPrompt(prompt: string, sections: SectionKind[]): Secti
     if (i >= 0) out.splice(i, 0, kind);
     else out.splice(Math.max(0, out.length - 1), 0, kind);
   };
+  const wants = (re: RegExp) => re.test(prompt.toLowerCase());
   if (promptWantsGallery(prompt)) insertBefore("gallery", "cta");
   if (promptWantsMap(prompt)) insertBefore("map", "cta");
+  if (wants(/\b(отзыв|reviews?)\b/i)) insertBefore("reviews", "cta");
+  if (wants(/\b(прайс|цены|тариф|pricing?)\b/i)) insertBefore("pricing", "cta");
+  if (wants(/\b(faq|вопрос|ответ)\b/i)) insertBefore("faq", "cta");
+  if (wants(/\b(процесс|этап|steps?)\b/i)) insertBefore("process", "cta");
+  if (wants(/\b(услуг|services?)\b/i)) insertBefore("services", "reviews");
+  if (wants(/\b(преимущ|benefits?)\b/i)) insertBefore("benefits", "services");
   return out;
 }
 
 function isAllowedGalleryImageUrl(s: string): boolean {
   const t = s.trim();
-  if (/^\/image\?/i.test(t)) return true;
-  return /^(https:\/\/)(upload\.wikimedia\.org|images\.unsplash\.com)(\/|$)/i.test(t);
+  return /^\/image\?/i.test(t);
 }
 
 function isAllowedMapEmbedUrl(s: string): boolean {
@@ -170,6 +182,70 @@ function defaultMapEmbedSrc(locale: SiteLocale): string {
     : "https://www.google.com/maps?q=55.755814%2C37.617635&output=embed";
 }
 
+function mapEmbedSrcForAddress(address: string, locale: SiteLocale): string {
+  const q = encodeURIComponent(address);
+  return locale === "ru"
+    ? `https://yandex.ru/map-widget/v1/?text=${q}&z=16`
+    : `https://www.google.com/maps?q=${q}&output=embed`;
+}
+
+function inferContactAddressFromMapEmbedSrc(src: string): string | undefined {
+  try {
+    const u = new URL(src.trim());
+    const raw = u.searchParams.get("text") ?? u.searchParams.get("q") ?? u.searchParams.get("addr");
+    return cleanPromptAddress(raw ?? undefined);
+  } catch {
+    return undefined;
+  }
+}
+
+function promptForbidsFooter(prompt: string): boolean {
+  return /без\s+футер|убери\s+футер|не\s+добавляй\s+футер|no\s+footer|remove\s+footer/i.test(prompt.toLowerCase());
+}
+
+function applyAddressToMapEmbeds(html: string, address: string, locale: SiteLocale): string {
+  const mapSrc = mapEmbedSrcForAddress(address, locale);
+  return html.replace(
+    /(<iframe\b[^>]*\ssrc\s*=\s*)(["'])(https?:\/\/(?:www\.)?(?:yandex\.ru\/map-widget\/v1\/[^"']*|google\.com\/maps[^"']*|maps\.google\.com\/[^"']*))\2/gi,
+    (_m, p1: string, q: string) => `${p1}${q}${mapSrc}${q}`,
+  );
+}
+
+function ensureMapSectionForAddress(html: string, address: string, locale: SiteLocale): string {
+  if (/<iframe\b[^>]*\ssrc\s*=\s*["']https?:\/\/(?:www\.)?(?:yandex\.ru\/map-widget\/v1\/|google\.com\/maps|maps\.google\.com\/)/i.test(html)) {
+    return applyAddressToMapEmbeds(html, address, locale);
+  }
+  const mapSrc = mapEmbedSrcForAddress(address, locale);
+  const title = locale === "ru" ? "Как нас найти" : "Find us";
+  const section = `<section id="contact-map" class="footer-map"><h2>${title}</h2><iframe class="map-container" src="${mapSrc}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></section>`;
+  if (/<\/footer\s*>/i.test(html)) return html.replace(/<\/footer\s*>/i, `</footer>\n${section}`);
+  if (/<\/body\s*>/i.test(html)) return html.replace(/<\/body\s*>/i, `${section}\n</body>`);
+  return `${html}\n${section}`;
+}
+
+export function enforcePromptContactsAndMapForHtml(html: string, prompt: string, locale: SiteLocale): string {
+  const wantsContacts = promptWantsContacts(prompt);
+  const address = inferContactAddressFromPrompt(prompt);
+  const phone = inferContactPhoneFromPrompt(prompt);
+  let out = html;
+  if (address) out = ensureMapSectionForAddress(out, address, locale);
+
+  if (!wantsContacts || promptForbidsFooter(prompt)) return out;
+  if (/data-ai-contact-block=["']1["']/i.test(out)) return out;
+
+  const addrValue = address ?? (locale === "ru" ? "не указан" : "not specified");
+  const phoneValue = phone ?? (locale === "ru" ? "не указан" : "not specified");
+  const telHref = phone ? ` href="tel:${phone.replace(/[^\d+]/g, "")}"` : "";
+  const contactsBlock = `<div data-ai-contact-block="1"><p><strong>${locale === "ru" ? "Адрес:" : "Address:"}</strong> ${addrValue}</p><p><strong>${locale === "ru" ? "Телефон:" : "Phone:"}</strong> <a${telHref}>${phoneValue}</a></p></div>`;
+
+  if (/<footer\b[^>]*>/i.test(out)) {
+    return out.replace(/<\/footer\s*>/i, `${contactsBlock}</footer>`);
+  }
+  const footer = `<footer id="contact" class="footer"><p>${locale === "ru" ? "Контакты" : "Contacts"}</p>${contactsBlock}</footer>`;
+  if (/<\/body\s*>/i.test(out)) return out.replace(/<\/body\s*>/i, `${footer}\n</body>`);
+  return `${out}\n${footer}`;
+}
+
 function galleryPoolForTemplate(
   templateId: TemplateId,
   prompt: string,
@@ -180,62 +256,71 @@ function galleryPoolForTemplate(
   return buildTemplateGalleryPool(templateId, locale, prompt, useBeauty);
 }
 
-function unsplashPhotoKey(src: string): string | undefined {
-  const m = src.trim().match(/images\.unsplash\.com\/photo-([^/?#]+)/i);
-  return m ? m[1].toLowerCase() : undefined;
-}
-
-const FOREIGN_GALLERY_KEYS_BY_TEMPLATE = new Map<TemplateId, Set<string>>();
-
-function foreignGalleryPhotoKeysFor(templateId: TemplateId): Set<string> {
-  const cached = FOREIGN_GALLERY_KEYS_BY_TEMPLATE.get(templateId);
-  if (cached) return cached;
-  const set = new Set<string>();
-  (Object.keys(REFERENCE_UNSPLASH_PHOTO_IDS_BY_TEMPLATE) as TemplateId[]).forEach((tid) => {
-    if (tid === templateId) return;
-    for (const id of REFERENCE_UNSPLASH_PHOTO_IDS_BY_TEMPLATE[tid]) {
-      set.add(id.toLowerCase());
-    }
-  });
-  FOREIGN_GALLERY_KEYS_BY_TEMPLATE.set(templateId, set);
-  return set;
-}
-
 export function filterGalleryItemsForTemplate(
   items: { src: string; alt: string }[] | undefined,
-  templateId: TemplateId,
+  _templateId: TemplateId,
 ): { src: string; alt: string }[] | undefined {
   if (!items?.length) return items;
-  const forbidden = foreignGalleryPhotoKeysFor(templateId);
-  const out = items.filter((g) => {
-    const key = unsplashPhotoKey(g.src);
-    if (key && forbidden.has(key)) return false;
-    return true;
-  });
+  const out = items.filter((g) => isAllowedGalleryImageUrl(g.src));
   return out.length ? out : undefined;
 }
 
-function dedupeAndPadGallery(
-  items: { src: string; alt: string }[] | undefined,
+const MAX_GALLERY_ITEMS = 12;
+
+function mergePoolFirstGallery(
+  requestedCount: number,
   pool: { src: string; altRu: string; altEn: string }[],
   locale: SiteLocale,
-  minCount: number,
 ): { src: string; alt: string }[] {
-  const seen = new Set<string>();
+  const target = Math.max(4, Math.min(MAX_GALLERY_ITEMS, requestedCount));
   const out: { src: string; alt: string }[] = [];
-  for (const g of items ?? []) {
-    const src = g.src?.trim();
-    if (!src || seen.has(src)) continue;
-    seen.add(src);
-    out.push({ src, alt: g.alt });
-  }
-  for (const p of pool) {
-    if (out.length >= minCount) break;
-    if (seen.has(p.src)) continue;
-    seen.add(p.src);
-    out.push({ src: p.src, alt: locale === "ru" ? p.altRu : p.altEn });
+  if (pool.length === 0) return out;
+
+  const withVariation = (src: string, index: number): string => {
+    try {
+      const u = new URL(src, "http://localhost");
+      u.searchParams.set("v", String(index));
+      return `${u.pathname}${u.search}`;
+    } catch {
+      const sep = src.includes("?") ? "&" : "?";
+      return `${src}${sep}v=${index}`;
+    }
+  };
+
+  for (let i = 0; i < target; i++) {
+    const p = pool[i % pool.length]!;
+    const altBase = locale === "ru" ? p.altRu : p.altEn;
+    out.push({
+      src: withVariation(p.src, i),
+      alt: i < pool.length ? altBase : `${altBase} ${i + 1}`,
+    });
   }
   return out;
+}
+
+function promptWantsServiceImages(prompt: string): boolean {
+  const t = prompt.toLowerCase();
+  return /(изображени|фото|картинк)[^.!?]{0,100}(услуг|категор|вид|товар|к\s+ним|их)|(?:услуг|категор|вид|товар)[^.!?]{0,100}(изображени|фото|картинк)|images?[^.!?]{0,100}(services?|categories?|products?)/i.test(
+    t,
+  );
+}
+
+function promptWantsCatalogCategories(prompt: string): boolean {
+  return /категор|вид(?:а|ов)?\s+(?:товар|игруш|категор)|categories?|product\s+categories/i.test(prompt);
+}
+
+function buildServiceGalleryItems(
+  services: string[],
+  templateId: TemplateId,
+): { src: string; alt: string }[] {
+  return services.slice(0, MAX_GALLERY_ITEMS).map((service, index) => {
+    const subject = service.trim();
+    const prompt = `${subject}. ${templateId} catalog item photo. professional website gallery image. subject: ${subject}`;
+    return {
+      src: toLocalImageUrl(prompt, { width: 520, height: 390 }, "gen_first", index),
+      alt: subject,
+    };
+  });
 }
 
 function parseGalleryItems(x: unknown): { src: string; alt: string }[] | undefined {
@@ -249,7 +334,7 @@ function parseGalleryItems(x: unknown): { src: string; alt: string }[] | undefin
     if (!src || !alt || !isAllowedGalleryImageUrl(src)) continue;
     out.push({ src, alt });
   }
-  return out.length ? out.slice(0, 8) : undefined;
+  return out.length ? out.slice(0, MAX_GALLERY_ITEMS) : undefined;
 }
 
 function parseSocialLinks(x: unknown): { label: string; href: string }[] | undefined {
@@ -297,27 +382,48 @@ function finalizeTemplateCore(prompt: string, locale: SiteLocale, templateId: Te
   const comp = getLandingCompositionDefaults(templateId, locale);
   const sections = ensureSectionsForPrompt(prompt, core.sections ?? [...comp.sections]);
   const skinId = resolveSkinFromPrompt(prompt, templateId, clampSkinId(core.skinId ?? comp.skinId));
+  const requestedServiceCount = inferRequestedServiceCount(prompt);
+  const defaultServices = fallbackServiceNames(templateId, locale, prompt);
+  const services = padServicesToMinimum(
+    promptWantsCatalogCategories(prompt) && requestedServiceCount > 0 ? [] : core.services,
+    requestedServiceCount,
+    defaultServices,
+    locale,
+  );
 
   const rawMap = String(core.mapEmbedSrc ?? "").trim();
-  let mapEmbedSrc = rawMap && isAllowedMapEmbedUrl(rawMap) ? rawMap : undefined;
+  const contactAddress =
+    inferContactAddressFromPrompt(prompt) ??
+    core.contactAddress ??
+    (rawMap && isAllowedMapEmbedUrl(rawMap) ? inferContactAddressFromMapEmbedSrc(rawMap) : undefined);
+  const contactPhone = inferContactPhoneFromPrompt(prompt) ?? core.contactPhone;
+  const contactRequested = promptWantsContacts(prompt) || Boolean(core.contactRequested);
+  let mapEmbedSrc = contactAddress
+    ? mapEmbedSrcForAddress(contactAddress, locale)
+    : rawMap && isAllowedMapEmbedUrl(rawMap)
+      ? rawMap
+      : undefined;
   if (sections.includes("map") && !mapEmbedSrc) mapEmbedSrc = defaultMapEmbedSrc(locale);
 
   const salonCtx: SalonContextFields = {
     title: core.title,
     subtitle: core.subtitle,
-    services: core.services,
+    services,
     templateId,
   };
 
   let galleryItems = core.galleryItems;
   if (sections.includes("gallery")) {
     const pool = galleryPoolForTemplate(templateId, prompt, salonCtx, locale);
-    galleryItems = dedupeAndPadGallery(
-      filterGalleryItemsForTemplate(galleryItems, templateId),
-      pool,
-      locale,
+    const requestedGalleryCount = Math.max(
       4,
+      inferRequestedGalleryCount(prompt),
+      promptWantsServiceImages(prompt) ? services.length : 0,
+      galleryItems?.length ?? 0,
     );
+    galleryItems = promptWantsServiceImages(prompt)
+      ? buildServiceGalleryItems(services.slice(0, requestedGalleryCount), templateId)
+      : mergePoolFirstGallery(requestedGalleryCount, pool, locale);
   }
   if (!sections.includes("map")) mapEmbedSrc = undefined;
   if (!sections.includes("gallery")) galleryItems = undefined;
@@ -339,9 +445,13 @@ function finalizeTemplateCore(prompt: string, locale: SiteLocale, templateId: Te
   return {
     ...core,
     templateId,
+    services,
     sections,
     skinId,
     mapEmbedSrc,
+    contactAddress,
+    contactPhone,
+    contactRequested,
     galleryItems,
     socialLinks,
     theme,
@@ -383,6 +493,9 @@ export type LandingData = {
   faq?: { q: string; a: string }[];
   galleryItems?: { src: string; alt: string }[];
   mapEmbedSrc?: string;
+  contactAddress?: string;
+  contactPhone?: string;
+  contactRequested?: boolean;
   socialLinks?: { label: string; href: string }[];
   theme?: LandingTheme;
 };
@@ -409,11 +522,12 @@ function landingHtmlFixerEnabled(): boolean {
 async function maybeRepairWithLlm(params: {
   provider: LlmProvider;
   locale: SiteLocale;
+  prompt: string;
   themedImage: string;
   enhanceOptions?: EnhanceLandingHtmlOptions;
   html: string;
 }): Promise<string> {
-  const { provider, locale, themedImage, enhanceOptions, html } = params;
+  const { provider, locale, prompt, themedImage, enhanceOptions, html } = params;
   if (!landingHtmlFixerEnabled()) return html;
 
   let issues = validateLandingHtml(html);
@@ -427,7 +541,9 @@ async function maybeRepairWithLlm(params: {
   try {
     const raw = await runLlmLandingHtml(provider, fixerSystem, fixerUser);
     const fixed = extractHtmlFromModelOutput(raw);
-    const out = repairLandingHtml(enhanceLandingHtml(fixed, themedImage, enhanceOptions));
+    const out = repairLandingHtml(
+      enforcePromptContactsAndMapForHtml(enhanceLandingHtml(fixed, themedImage, enhanceOptions), prompt, locale),
+    );
     if (isPlausibleHtml(out)) return out;
   } catch {
   }
@@ -437,12 +553,13 @@ async function maybeRepairWithLlm(params: {
 async function generateHtmlWithRetries(params: {
   provider: LlmProvider;
   system: string;
+  prompt: string;
   userMessage: string;
   themedImage: string;
   locale: SiteLocale;
   enhanceOptions?: EnhanceLandingHtmlOptions;
 }): Promise<string> {
-  const { provider, system, userMessage, themedImage, locale, enhanceOptions } = params;
+  const { provider, system, prompt, userMessage, themedImage, locale, enhanceOptions } = params;
   const { maxAttempts, timeoutMs } = htmlGenerationLimits();
   const deadline = Date.now() + timeoutMs;
   let lastValidHtml = "";
@@ -451,10 +568,12 @@ async function generateHtmlWithRetries(params: {
     if (Date.now() >= deadline) break;
     const raw = await runLlmLandingHtml(provider, system, userMessage);
     let candidate = enhanceLandingHtml(extractHtmlFromModelOutput(raw), themedImage, enhanceOptions);
+    candidate = enforcePromptContactsAndMapForHtml(candidate, prompt, locale);
     candidate = repairLandingHtml(candidate);
     candidate = await maybeRepairWithLlm({
       provider,
       locale,
+      prompt,
       themedImage,
       enhanceOptions,
       html: candidate,
@@ -649,6 +768,147 @@ function parsePricingItems(x: unknown): { name: string; price: string; bullets: 
 }
 
 const MAX_PRICING_CARDS = 12;
+const MAX_SERVICE_CARDS = 12;
+
+function fallbackServiceNames(templateId: TemplateId, locale: SiteLocale, prompt = ""): string[] {
+  const wantsToys = /игруш|toy/i.test(prompt);
+  if (templateId === "ecommerce" && wantsToys) {
+    return locale === "ru"
+      ? [
+          "Развивающие игрушки",
+          "Конструкторы",
+          "Куклы и аксессуары",
+          "Мягкие игрушки",
+          "Настольные игры",
+          "Машинки и транспорт",
+          "Творчество и наборы для рисования",
+          "Игрушки для малышей",
+          "Уличные игрушки",
+          "Музыкальные игрушки",
+          "Пазлы",
+          "Роботы и интерактивные игрушки",
+        ]
+      : [
+          "Educational toys",
+          "Building sets",
+          "Dolls and accessories",
+          "Plush toys",
+          "Board games",
+          "Toy cars and transport",
+          "Creative art kits",
+          "Toddler toys",
+          "Outdoor toys",
+          "Musical toys",
+          "Puzzles",
+          "Interactive robots",
+        ];
+  }
+  const ru: Record<TemplateId, string[]> = {
+    dental: [
+      "Профгигиена и осмотр",
+      "Лечение кариеса",
+      "Отбеливание зубов",
+      "Имплантация",
+      "Протезирование",
+      "Эстетическая реставрация",
+      "Лечение дёсен",
+      "Детская стоматология",
+    ],
+    auto: [
+      "Диагностика автомобиля",
+      "Техническое обслуживание",
+      "Ремонт двигателя",
+      "Ремонт подвески",
+      "Шиномонтаж",
+      "Развал-схождение",
+      "Замена масла",
+      "Детейлинг",
+    ],
+    repair: [
+      "Диагностика на месте",
+      "Сантехнические работы",
+      "Электрика",
+      "Ремонт техники",
+      "Сборка мебели",
+      "Мелкий бытовой ремонт",
+      "Замена комплектующих",
+      "Гарантийное обслуживание",
+    ],
+    realestate: [
+      "Подбор недвижимости",
+      "Продажа квартиры",
+      "Покупка дома",
+      "Юридическая проверка",
+      "Ипотечное сопровождение",
+      "Оценка объекта",
+      "Аренда недвижимости",
+      "Сопровождение сделки",
+    ],
+    ecommerce: [
+      "Популярные товары",
+      "Новинки",
+      "Подарки",
+      "Товары для дома",
+      "Аксессуары",
+      "Сезонные товары",
+      "Товары со скидкой",
+      "Премиум-коллекция",
+    ],
+  };
+  const en: Record<TemplateId, string[]> = {
+    dental: [
+      "Cleaning and exam",
+      "Cavity treatment",
+      "Teeth whitening",
+      "Dental implants",
+      "Prosthetics",
+      "Cosmetic restoration",
+      "Gum treatment",
+      "Pediatric dentistry",
+    ],
+    auto: [
+      "Vehicle diagnostics",
+      "Scheduled maintenance",
+      "Engine repair",
+      "Suspension repair",
+      "Tire service",
+      "Wheel alignment",
+      "Oil change",
+      "Detailing",
+    ],
+    repair: [
+      "On-site diagnostics",
+      "Plumbing repairs",
+      "Electrical work",
+      "Appliance repair",
+      "Furniture assembly",
+      "Small home repairs",
+      "Parts replacement",
+      "Warranty service",
+    ],
+    realestate: [
+      "Property search",
+      "Apartment sale",
+      "Home purchase",
+      "Legal check",
+      "Mortgage support",
+      "Property valuation",
+      "Rental search",
+      "Deal support",
+    ],
+    ecommerce: [
+      "Best sellers",
+      "New arrivals",
+      "Gifts",
+      "Home goods",
+      "Accessories",
+      "Seasonal products",
+      "Discounted items",
+      "Premium collection",
+    ],
+  };
+  return locale === "ru" ? ru[templateId] : en[templateId];
+}
 
 export function inferMinPricingCardsFromPrompt(prompt: string): number {
   const t = prompt.toLowerCase();
@@ -666,6 +926,119 @@ export function inferMinPricingCardsFromPrompt(prompt: string): number {
   collect(String.raw`минимум\s+(\d{1,2})\b`);
   collect(String.raw`at\s+least\s+(\d{1,2})\b`);
   return max;
+}
+
+export function inferRequestedServiceCount(prompt: string): number {
+  const t = prompt.toLowerCase();
+  let max = 0;
+  const collect = (source: string) => {
+    const r = new RegExp(source, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = r.exec(t)) !== null) {
+      const n = parseInt(m[1], 10);
+      if (n >= 2 && n <= MAX_SERVICE_CARDS) max = Math.max(max, n);
+    }
+  };
+  collect(String.raw`(\d{1,2})\s+услуг(?:а|и|ами)?`);
+  collect(String.raw`(\d{1,2})\s+(?:вид(?:а|ов)?\s+)?категор(?:и(?:я|и|й)|иями)?`);
+  collect(String.raw`(\d{1,2})\s+(?:вид(?:а|ов)?\s+)?товар(?:а|ов)?`);
+  collect(String.raw`(\d{1,2})\s+services?\b`);
+  collect(String.raw`(\d{1,2})\s+categor(?:y|ies)\b`);
+  collect(String.raw`(\d{1,2})\s+products?\b`);
+  collect(String.raw`не\s+менее\s+(\d{1,2})\s+услуг`);
+  collect(String.raw`не\s+менее\s+(\d{1,2})\s+категор`);
+  collect(String.raw`минимум\s+(\d{1,2})\s+услуг`);
+  collect(String.raw`минимум\s+(\d{1,2})\s+категор`);
+  return max;
+}
+
+export function inferContactAddressFromPrompt(prompt: string): string | undefined {
+  const normalized = prompt.replace(/\s+/g, " ").trim();
+  const patterns = [
+    /(?:адрес|address)\s*[:—–-]\s*([^;]+)/i,
+    /(?:адресом|address)\s+([^;]+)/i,
+    /контакты?\s*[:—–-]\s*([^;]+)/i,
+    /(?:по адресу|наход(?:ится|имся)\s+по адресу|расположен[аы]?\s+по адресу)\s+([^;]+)/i,
+  ];
+  for (const re of patterns) {
+    const m = normalized.match(re);
+    const candidate = cleanPromptAddress(m?.[1]);
+    if (candidate) return candidate;
+  }
+  return undefined;
+}
+
+function cleanPromptAddress(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const cleaned = raw
+    .replace(
+      /\s+(?:а\s+также|и\s+контакт|и\s+телефон\w*|и\s+прикрепи\s+карт\w*|контакт|телефон|тел\.?|phone|почта|email|e-mail|карта|режим|часы|соцсет).*$/i,
+      "",
+    )
+    .replace(/^[\s"'«»]+|[\s"',.?!«»]+$/g, "")
+    .trim();
+  if (cleaned.length < 5 || cleaned.length > 180) return undefined;
+  if (/^(?:с\s+)?конкретн\w*\s+адрес\w*$/i.test(cleaned)) return undefined;
+  const looksLikeAddress =
+    /\d/.test(cleaned) ||
+    /\b(ул\.?|улица|проспект|пр-т|переулок|пер\.?|шоссе|набережная|дом|д\.|офис|street|st\.|road|rd\.|avenue|ave\.|building)\b/i.test(
+      cleaned,
+    );
+  return looksLikeAddress ? cleaned : undefined;
+}
+
+export function inferContactPhoneFromPrompt(prompt: string): string | undefined {
+  const normalized = prompt.replace(/\s+/g, " ").trim();
+  const labeled = normalized.match(/(?:телефон|phone|tel\.?)\s*[:—–-]?\s*([+()0-9\s-]{7,24})/i)?.[1];
+  const raw = labeled ?? normalized.match(/(?:\+7|8)\s*[\s(-]?\d[\d\s()?-]{8,18}/)?.[0];
+  if (!raw) return undefined;
+  const phone = raw.replace(/\s+/g, " ").trim().replace(/[,.!?;:]+$/g, "");
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15 ? phone : undefined;
+}
+
+function inferRequestedGalleryCount(prompt: string): number {
+  const t = prompt.toLowerCase();
+  let max = 0;
+  const collect = (source: string) => {
+    const r = new RegExp(source, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = r.exec(t)) !== null) {
+      const n = parseInt(m[1], 10);
+      if (n >= 3 && n <= MAX_GALLERY_ITEMS) max = Math.max(max, n);
+    }
+  };
+  collect(String.raw`(\d{1,2})\s+изображени(?:е|я|й)`);
+  collect(String.raw`(\d{1,2})\s+фот(?:о|ограф(?:ия|ии|ий))`);
+  collect(String.raw`(\d{1,2})\s+(?:вид(?:а|ов)?\s+)?категор(?:и(?:я|и|й)|иями)?[^.!?]{0,80}(?:изображени|фото|картинк)`);
+  collect(String.raw`(\d{1,2})\s+(?:вид(?:а|ов)?\s+)?товар(?:а|ов)?[^.!?]{0,80}(?:изображени|фото|картинк)`);
+  collect(String.raw`at\s+least\s+(\d{1,2})\s+images?`);
+  collect(String.raw`(\d{1,2})\s+images?`);
+  return max;
+}
+
+function padServicesToMinimum(
+  rows: string[],
+  min: number,
+  defaults: string[],
+  locale: SiteLocale,
+): string[] {
+  const out = rows.map((s) => s.trim()).filter(Boolean);
+  const need = Math.min(MAX_SERVICE_CARDS, Math.max(min, out.length));
+  const fallback =
+    defaults.length > 0
+      ? defaults
+      : locale === "ru"
+        ? ["Консультация", "Диагностика", "Подбор решения"]
+        : ["Consultation", "Diagnostics", "Solution selection"];
+  let i = 0;
+  while (out.length < need) {
+    const candidate = fallback[i % fallback.length]!;
+    const name = out.includes(candidate) ? `${candidate} ${out.length + 1}` : candidate;
+    out.push(name);
+    i += 1;
+  }
+  return out.slice(0, MAX_SERVICE_CARDS);
 }
 
 function padPricingToMinimum(
@@ -733,7 +1106,7 @@ function parseJson(text: string, locale: SiteLocale, prompt: string): ContentCor
     const subtitle = String(raw.subtitle ?? "");
     const cta = String(raw.cta ?? (locale === "ru" ? "Связаться с нами" : "Contact us"));
     const services = Array.isArray(raw.services)
-      ? raw.services.map((s) => String(s)).filter(Boolean).slice(0, 8)
+      ? raw.services.map((s) => String(s)).filter(Boolean).slice(0, 12)
       : [];
     const reviewsRaw = Array.isArray(raw.reviews) ? raw.reviews : [];
     const reviews = reviewsRaw
@@ -748,6 +1121,19 @@ function parseJson(text: string, locale: SiteLocale, prompt: string): ContentCor
       .slice(0, 4);
 
     if (!title || services.length === 0) return null;
+
+    const rawContact = raw.contact && typeof raw.contact === "object" ? (raw.contact as Record<string, unknown>) : undefined;
+    const contactAddress =
+      cleanPromptAddress(String(raw.contactAddress ?? raw.address ?? rawContact?.address ?? "")) ??
+      inferContactAddressFromPrompt(prompt);
+    const contactPhone =
+      inferContactPhoneFromPrompt(
+        String(raw.contactPhone ?? raw.phone ?? rawContact?.phone ?? rawContact?.tel ?? "") || prompt,
+      ) ?? inferContactPhoneFromPrompt(prompt);
+    const contactRequested =
+      Boolean(raw.contactRequested) ||
+      Boolean(raw.contact || raw.contactAddress || raw.address || raw.contactPhone || raw.phone) ||
+      promptWantsContacts(prompt);
 
     const rawMap = String(raw.mapEmbedSrc ?? "").trim();
     const mapFromModel = rawMap && isAllowedMapEmbedUrl(rawMap) ? rawMap : undefined;
@@ -782,6 +1168,9 @@ function parseJson(text: string, locale: SiteLocale, prompt: string): ContentCor
       faq: parseFaqItems(raw.faq) ?? comp.faq,
       galleryItems: parseGalleryItems(raw.galleryItems),
       mapEmbedSrc: mapFromModel,
+      contactAddress,
+      contactPhone,
+      contactRequested,
       socialLinks: parseSocialLinks(raw.socialLinks),
       theme: sanitizeLandingTheme(raw.theme),
     });
@@ -895,6 +1284,7 @@ export async function generateLandingContent(
       const html = await generateHtmlWithRetries({
         provider,
         system,
+        prompt,
         userMessage,
         themedImage,
         locale,
@@ -923,6 +1313,7 @@ export async function generateLandingContent(
           const html = await generateHtmlWithRetries({
             provider: "gigachat",
             system,
+            prompt,
             userMessage,
             themedImage,
             locale,

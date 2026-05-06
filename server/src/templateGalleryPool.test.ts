@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { buildTemplateGalleryPool } from "./templateGalleryPool.js";
 
 describe("buildTemplateGalleryPool", () => {
-  it("даёт /image с prefer=stock и разными промптами по вертикали", () => {
+  it("даёт /image с prefer=gen и разными промптами по вертикали", () => {
     const pool = buildTemplateGalleryPool("repair", "ru", "ремонт стиральных машин", false);
     expect(pool).toHaveLength(4);
     for (const item of pool) {
       expect(item.src).toMatch(/^\/image\?/);
-      expect(item.src).toContain("prefer=stock");
+      expect(item.src).toContain("prefer=gen");
       expect(item.src).toContain("w=520");
       expect(item.src).toContain("h=390");
       expect(item.altRu.length).toBeGreaterThan(0);

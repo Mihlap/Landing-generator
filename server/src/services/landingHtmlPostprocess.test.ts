@@ -150,6 +150,22 @@ describe("enhanceLandingHtml", () => {
     expect(out).toContain('alt="Section image"');
   });
 
+  it("удаляет inline data:image из img и не считает его валидной визуализацией", () => {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <body>
+          <section class="benefits">
+            <img src="data:image/svg+xml,%3Csvg%3E%3C/svg%3E" alt="icon">
+          </section>
+        </body>
+      </html>
+    `;
+    const out = enhanceLandingHtml(html);
+    expect(out).not.toMatch(/<img[^>]*src="data:image/i);
+    expect(out).toContain("/image?prompt=");
+  });
+
   it("заменяет пустые background-image url() на fallback", () => {
     const html = `
       <!DOCTYPE html>
@@ -182,6 +198,26 @@ describe("enhanceLandingHtml", () => {
     const out = enhanceLandingHtml(html);
     expect(out).toContain('data-landing-visuals="1"');
     expect((out.match(/\/image\?prompt=/g) || []).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("добавляет сетку отступов для секции с class='review' и review-grid", () => {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <body>
+          <section class="review" id="reviews">
+            <h2>Отзывы</h2>
+            <div class="review-grid">
+              <div class="review-card">A</div>
+              <div class="review-card">B</div>
+            </div>
+          </section>
+        </body>
+      </html>
+    `;
+    const out = enhanceLandingHtml(html);
+    expect(out).toContain("section.review [class*=\"review-grid\"]");
+    expect(out).toContain("section.review > .review + .review");
   });
 
   it("по skipVisualEnrichment не вставляет hero и галерею", () => {
@@ -223,21 +259,28 @@ describe("enhanceLandingHtml", () => {
     expect(out).toContain('id="newsletter-form"');
   });
 
-  it("по умолчанию не заменяет Unsplash на /image", () => {
-    vi.unstubAllEnvs();
-    delete process.env.LANDING_REPLACE_STOCK_WITH_AI;
-    const html = `<!DOCTYPE html><html><head><title>T</title></head><body><img src="https://images.unsplash.com/photo-1?w=100" alt="rose"></body></html>`;
-    const out = enhanceLandingHtml(html);
-    expect(out).toMatch(/<img[^>]*src="https:\/\/images\.unsplash\.com\/photo-1[^"]*"/);
-    const fromStock = (out.match(/<img[^>]*src="https:\/\/images\.unsplash\.com\/photo-1[^"]*"[^>]*>/gi) || []).length;
-    expect(fromStock).toBeGreaterThanOrEqual(1);
-  });
-
-  it("по LANDING_REPLACE_STOCK_WITH_AI=true переписывает stock в /image", () => {
-    vi.stubEnv("LANDING_REPLACE_STOCK_WITH_AI", "true");
+  it("всегда переписывает внешние stock-изображения в локальный AI endpoint", () => {
     const html = `<!DOCTYPE html><html><head><title>T</title></head><body><img src="https://images.unsplash.com/photo-1?w=100" alt="rose"></body></html>`;
     const out = enhanceLandingHtml(html);
     expect(out).toMatch(/\/image\?/);
+    expect(out).not.toContain("images.unsplash.com");
+  });
+
+  it("по умолчанию вырезает inline svg из HTML модели", () => {
+    vi.unstubAllEnvs();
+    delete process.env.LANDING_ALLOW_INLINE_SVG;
+    const html = `<!DOCTYPE html><html><body><section><h2>Плюс</h2><svg viewBox="0 0 24 24"><path d="M1 1"/></svg><p>Текст</p></section></body></html>`;
+    const out = enhanceLandingHtml(html, undefined, { skipVisualEnrichment: true });
+    expect(out).not.toMatch(/<svg\b/i);
+    expect(out).toContain("<h2>Плюс</h2>");
+    expect(out).toContain("<p>Текст</p>");
+  });
+
+  it("по LANDING_ALLOW_INLINE_SVG=true сохраняет inline svg", () => {
+    vi.stubEnv("LANDING_ALLOW_INLINE_SVG", "true");
+    const html = `<!DOCTYPE html><html><body><section><svg viewBox="0 0 24 24"><path d="M1 1"/></svg></section></body></html>`;
+    const out = enhanceLandingHtml(html, undefined, { skipVisualEnrichment: true });
+    expect(out).toMatch(/<svg\b/i);
     vi.unstubAllEnvs();
   });
 });

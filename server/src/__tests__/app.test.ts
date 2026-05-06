@@ -15,6 +15,8 @@ const mockedGenerate = vi.mocked(ai.generateLandingContent);
 describe("HTTP API", () => {
   beforeEach(() => {
     mockedGenerate.mockReset();
+    delete process.env.ENABLE_LANDING_PRESETS;
+    delete process.env.IMAGE_PROVIDER;
   });
 
   describe("GET /health", () => {
@@ -27,18 +29,25 @@ describe("HTTP API", () => {
   describe("POST /generate", () => {
     it("400 без prompt", async () => {
       const res = await request(app).post("/generate").send({}).expect(400);
-      expect(res.body.error).toBe("prompt is required");
+      expect(res.body.error.code).toBe("PROMPT_REQUIRED");
+      expect(res.body.error.message).toBe("prompt is required");
+      expect(res.body.error.retryable).toBe(false);
+      expect(typeof res.body.error.requestId).toBe("string");
+      expect(res.headers["x-request-id"]).toBe(res.body.error.requestId);
     });
 
     it("400 при пустом prompt", async () => {
       const res = await request(app).post("/generate").send({ prompt: "   " }).expect(400);
-      expect(res.body.error).toBe("prompt is required");
+      expect(res.body.error.code).toBe("PROMPT_REQUIRED");
+      expect(res.body.error.message).toBe("prompt is required");
     });
 
     it("502 при ошибке генерации", async () => {
       mockedGenerate.mockRejectedValueOnce(new Error("LLM down"));
       const res = await request(app).post("/generate").send({ prompt: "тест" }).expect(502);
-      expect(res.body.error).toBe("LLM down");
+      expect(res.body.error.code).toBe("GENERATION_FAILED");
+      expect(res.body.error.message).toBe("LLM down");
+      expect(res.body.error.retryable).toBe(true);
     });
 
     it("200 и JSON при успехе", async () => {
@@ -48,7 +57,11 @@ describe("HTTP API", () => {
         .send({ prompt: "стоматология", locale: "ru" })
         .expect(200);
       expect(res.body).toEqual(validLandingData);
-      expect(mockedGenerate).toHaveBeenCalledWith("стоматология", "ru", {});
+      expect(mockedGenerate).toHaveBeenCalledWith(
+        "стоматология",
+        "ru",
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
     });
 
     it("передаёт generateMode в generateLandingContent", async () => {
@@ -57,17 +70,29 @@ describe("HTTP API", () => {
         .post("/generate")
         .send({ prompt: "тест", locale: "ru", generateMode: "template" })
         .expect(200);
-      expect(mockedGenerate).toHaveBeenCalledWith("тест", "ru", { generateMode: "template" });
+      expect(mockedGenerate).toHaveBeenCalledWith(
+        "тест",
+        "ru",
+        expect.objectContaining({ generateMode: "template", signal: expect.any(AbortSignal) }),
+      );
     });
 
     it("невалидный locale даёт en только если en, иначе ru", async () => {
       mockedGenerate.mockResolvedValueOnce(validLandingData);
       await request(app).post("/generate").send({ prompt: "x", locale: "xx" }).expect(200);
-      expect(mockedGenerate).toHaveBeenCalledWith("x", "ru", {});
+      expect(mockedGenerate).toHaveBeenCalledWith(
+        "x",
+        "ru",
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
 
       mockedGenerate.mockResolvedValueOnce({ ...validLandingData, locale: "en" });
       await request(app).post("/generate").send({ prompt: "y", locale: "en" }).expect(200);
-      expect(mockedGenerate).toHaveBeenCalledWith("y", "en", {});
+      expect(mockedGenerate).toHaveBeenCalledWith(
+        "y",
+        "en",
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
     });
   });
 
@@ -94,6 +119,46 @@ describe("HTTP API", () => {
         .expect(200);
       expect(res.text).toContain("from-model");
       expect(res.text).not.toContain(validLandingData.title);
+    });
+  });
+
+  describe("GET /image", () => {
+    it("отдаёт нейтральный fallback как изображение, если AI provider недоступен", async () => {
+      process.env.IMAGE_PROVIDER = "off";
+      const res = await request(app).get("/image?prompt=лендинг%20риелтора&w=520&h=390").expect(200);
+      expect(res.headers["content-type"]).toMatch(/image\/svg\+xml/);
+      expect(Buffer.from(res.body).toString("utf8")).toContain("Изображение генерируется");
+    });
+  });
+
+  describe("POST /preview/preset", () => {
+    it("404 если feature-flag выключен", async () => {
+      const res = await request(app)
+        .post("/preview/preset")
+        .send({ data: validLandingData, preset: "sales" })
+        .expect(404);
+      expect(res.body.error).toBe("presets are disabled");
+    });
+
+    it("400 при невалидном preset", async () => {
+      process.env.ENABLE_LANDING_PRESETS = "true";
+      const res = await request(app)
+        .post("/preview/preset")
+        .send({ data: validLandingData, preset: "unknown" })
+        .expect(400);
+      expect(res.body.error).toBe("invalid preset");
+    });
+
+    it("200 и json с html при валидном preset", async () => {
+      process.env.ENABLE_LANDING_PRESETS = "true";
+      const res = await request(app)
+        .post("/preview/preset")
+        .send({ data: validLandingData, preset: "sales" })
+        .expect(200);
+      expect(res.headers["content-type"]).toMatch(/application\/json/);
+      expect(res.body.data).toBeTruthy();
+      expect(res.body.data.sections[0]).toBe("hero");
+      expect(res.body.html).toContain("<!DOCTYPE html>");
     });
   });
 

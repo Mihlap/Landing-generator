@@ -229,6 +229,7 @@ export const LEAD_ALIGN_SCRIPT = `<script ${LEAD_ALIGN_MARKER}="1">
 export const IMAGE_RETRY_SCRIPT = `<script ${IMAGE_RETRY_MARKER}="1">
 (function(){
   var FALLBACK=${JSON.stringify(FALLBACK_IMAGE_SRC)};
+  var FALLBACK_PLACEHOLDER="data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%201200%20700'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0'%20y1='0'%20x2='1'%20y2='1'%3E%3Cstop%20stop-color='%23111827'/%3E%3Cstop%20offset='1'%20stop-color='%23312e81'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width='1200'%20height='700'%20fill='url(%23g)'/%3E%3Ctext%20x='50%25'%20y='52%25'%20text-anchor='middle'%20fill='%23eef2ff'%20font-family='Arial,sans-serif'%20font-size='40'%20font-weight='700'%3E%D0%93%D0%B5%D0%BD%D0%B5%D1%80%D0%B0%D1%86%D0%B8%D1%8F%20%D0%B8%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D1%8F%3C/text%3E%3C/svg%3E";
   var MAX = 14;
   var DELAYS = [350, 700, 1200, 2000, 3200, 5000, 8000];
   function isProxySrc(src){
@@ -251,32 +252,52 @@ export const IMAGE_RETRY_SCRIPT = `<script ${IMAGE_RETRY_MARKER}="1">
     var base = stripRetryParams(raw);
     var n = 0;
     var busy = false;
-    function bump(){
-      if(ok(img)) return;
+    var original = raw;
+    var probe = new Image();
+    function setPlaceholder(){
+      if(img.dataset.landingImgPlaceholder === "1") return;
+      img.dataset.landingImgPlaceholder = "1";
+      img.src = FALLBACK_PLACEHOLDER;
+    }
+    function probeNext(){
       if(busy) return;
       if(n >= MAX){
-        img.removeAttribute("src");
         img.src = FALLBACK;
         return;
       }
       busy = true;
       n += 1;
       var sep = base.indexOf("?") >= 0 ? "&" : "?";
-      img.src = base + sep + "retry=" + n + "-" + Date.now();
-      window.setTimeout(function(){ busy = false; }, 80);
+      var candidate = base + sep + "retry=" + n + "-" + Date.now();
+      probe.onload = function(){
+        busy = false;
+        img.dataset.landingImgPlaceholder = "0";
+        img.src = candidate;
+      };
+      probe.onerror = function(){
+        busy = false;
+        window.setTimeout(probeNext, DELAYS[Math.min(n, DELAYS.length-1)] || 2500);
+      };
+      probe.src = candidate;
     }
     img.addEventListener("error", function(){
-      window.setTimeout(bump, DELAYS[Math.min(n, DELAYS.length-1)] || 2500);
+      setPlaceholder();
+      window.setTimeout(probeNext, DELAYS[Math.min(n, DELAYS.length-1)] || 2500);
     });
     if(img.complete && !ok(img)){
-      window.setTimeout(bump, DELAYS[0]);
+      setPlaceholder();
+      window.setTimeout(probeNext, DELAYS[0]);
+    }
+    if(img.complete && ok(img) && String(original).indexOf("/image?") >= 0){
+      img.dataset.landingImgPlaceholder = "0";
     }
     if("IntersectionObserver" in window){
       var io = new IntersectionObserver(function(entries){
         entries.forEach(function(e){
-          if(e.isIntersecting && !ok(img) && img.dataset.landingImgIo !== "1"){
+          if(e.isIntersecting && img.dataset.landingImgIo !== "1"){
             img.dataset.landingImgIo = "1";
-            bump();
+            if(!ok(img)) setPlaceholder();
+            probeNext();
           }
         });
       }, { rootMargin: "120px", threshold: 0.01 });

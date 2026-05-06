@@ -1,13 +1,13 @@
 import type { ImagePreference } from "./landingHtmlPostprocessTypes.js";
 
 function preferParam(pref: ImagePreference | undefined): "stock" | "gen" | undefined {
-  if (pref === "stock_first") return "stock";
+  if (pref === "stock_first") return "gen";
   if (pref === "gen_first") return "gen";
   return undefined;
 }
 
 export const FALLBACK_IMAGE_SRC =
-  "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1600&q=80";
+  "/image?prompt=modern%20professional%20website%20hero%20image&w=1280&h=720&prefer=gen";
 export const INLINE_IMAGE_FALLBACK =
   "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 700'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%232563eb'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1200' height='700' fill='url(%23g)'/%3E%3Ctext x='50%25' y='50%25' fill='white' font-size='48' text-anchor='middle' dominant-baseline='middle' font-family='system-ui,sans-serif'%3EPreview image%3C/text%3E%3C/svg%3E";
 
@@ -108,7 +108,17 @@ export function replaceStockImagesWithAi(html: string, imagePreference?: ImagePr
     const src = srcMatch?.[2]?.trim() ?? "";
     if (!src) return tag;
   
-    if (/^\/image\?/i.test(src)) return tag;
+    const altMatch = /\salt\s*=\s*(["'])(.*?)\1/i.exec(tag);
+    const alt = altMatch?.[2]?.trim() ?? "";
+    const basePrompt = alt || "Website section illustration";
+    const fullPrompt = title ? `${basePrompt}. ${title}.` : basePrompt;
+
+    if (/^\/image\?/i.test(src)) {
+      if (!shouldRewriteLocalPrompt(src)) return tag;
+      const size = /class\s*=\s*(["'])[^"']*\bhero\b/i.test(tag) ? heroSize : cardSize;
+      const aiUrl = toLocalImageUrl(fullPrompt, size, imagePreference);
+      return tag.replace(/\ssrc\s*=\s*(["'])(.*?)\1/i, ` src="${aiUrl}"`);
+    }
     if (!/^(https?:\/\/)/i.test(src)) return tag;
     if (
       !/(images\.unsplash\.com|upload\.wikimedia\.org|image\.pollinations\.ai|pravatar\.cc|i\.pravatar\.cc|randomuser\.me|ui-avatars\.com)/i.test(
@@ -117,21 +127,17 @@ export function replaceStockImagesWithAi(html: string, imagePreference?: ImagePr
     )
       return tag;
 
-    const altMatch = /\salt\s*=\s*(["'])(.*?)\1/i.exec(tag);
-    const alt = altMatch?.[2]?.trim() ?? "";
-
     const isHero = /data-landing-title-fix\s*=\s*(["'])1\1/i.test(html) && /class\s*=\s*(["'])[^"']*\bhero\b/i.test(html)
       ? /class\s*=\s*(["'])[^"']*\bhero\b[^"']*\1/i.test(html.slice(Math.max(0, html.indexOf(tag) - 400), html.indexOf(tag) + 400))
       : /class\s*=\s*(["'])[^"']*\bhero\b/i.test(tag);
 
     const isFakeAvatar =
       /pravatar\.cc|i\.pravatar\.cc|randomuser\.me|ui-avatars\.com/i.test(src);
-    const basePrompt = isFakeAvatar
+    const effectivePrompt = isFakeAvatar
       ? `Customer portrait headshot for website testimonial, ${alt || "anonymous reviewer"}`
-      : alt || "Website section illustration";
-    const fullPrompt = title ? `${basePrompt}. ${title}.` : basePrompt;
+      : fullPrompt;
     const size = isFakeAvatar ? { width: 400, height: 400 } : isHero ? heroSize : cardSize;
-    const aiUrl = toLocalImageUrl(fullPrompt, size, imagePreference);
+    const aiUrl = toLocalImageUrl(effectivePrompt, size, imagePreference);
 
     if (srcMatch) {
       return tag.replace(/\ssrc\s*=\s*(["'])(.*?)\1/i, ` src="${aiUrl}"`);
@@ -140,6 +146,15 @@ export function replaceStockImagesWithAi(html: string, imagePreference?: ImagePr
   });
 }
 
-export function shouldReplaceStockWithAi(): boolean {
-  return process.env.LANDING_REPLACE_STOCK_WITH_AI?.trim().toLowerCase() === "true";
+function shouldRewriteLocalPrompt(src: string): boolean {
+  try {
+    const u = new URL(src, "http://localhost");
+    const raw = (u.searchParams.get("prompt") ?? "").toLowerCase();
+    if (!raw) return true;
+    if (/(киров|москва|ул\.|улица|д\.|дом|адрес|контакт|тел|телефон|карта|map|phone)/i.test(raw)) return true;
+    return false;
+  } catch {
+    return false;
+  }
 }
+

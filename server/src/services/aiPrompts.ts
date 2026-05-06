@@ -256,15 +256,13 @@ PROCESS / HOW IT WORKS:
 
 Галерея / несколько фото одной темы: у каждого <img> свой осмысленный alt и свой уникальный промпт (разные ракурсы, композиции). Один и тот же промпт даёт одинаковые картинки — избегай.
 
-Только источники изображений:
-- https://upload.wikimedia.org (прямые ссылки на файлы Wikimedia Commons)
-- https://images.unsplash.com
-- https://image.pollinations.ai/prompt/...
+Только один источник изображений:
+- локальный AI endpoint /image?prompt=...&w=1280&h=720
 
-Для Pollinations:
-- URL: https://image.pollinations.ai/prompt/ТВОЙ_ПРОМПТ?width=1280&height=720
-- Промпт в URL должен быть url-encoded (пробелы → %20, русские символы тоже кодируются)
-- Промпт должен быть релевантен бизнесу и содержать уникальные детали для каждого изображения
+Для /image:
+- prompt в URL должен быть url-encoded (пробелы → %20, русские символы тоже кодируются)
+- prompt должен быть релевантен бизнесу и содержать уникальные детали для каждого изображения
+- для галерей и карточек делай разные prompt, чтобы изображения не повторялись
 
 Запрещено:
 - пустые src
@@ -752,7 +750,7 @@ hero, benefits, services, gallery, pricing, reviews, process, faq, map, cta, foo
     { "title": "выгода", "text": "1 предложение пользы" }
   ],
   "galleryItems": [
-    { "src": "https://images.unsplash.com/...", "alt": "описание кадра" }
+    { "src": "/image?prompt=%D0%BE%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5%20%D0%BA%D0%B0%D0%B4%D1%80%D0%B0&w=520&h=390", "alt": "описание кадра" }
   ],
   "mapEmbedSrc": "https://yandex.ru/map-widget/v1/?ll=...",
   "socialLinks": [
@@ -801,7 +799,7 @@ hero, benefits, services, gallery, pricing, reviews, process, faq, map, cta, foo
 🎨 ГИБКОСТЬ
 ========================================
 Поля galleryItems, mapEmbedSrc, socialLinks опциональны; заполняй, если это следует из описания.
-Для galleryItems: HTTPS с images.unsplash.com, upload.wikimedia.org, или /image?prompt=...&w=520&h=390.
+Для galleryItems: только /image?prompt=...&w=520&h=390. Не используй внешние HTTPS-источники изображений.
 Для mapEmbedSrc: только встраиваемый URL (yandex.ru/map-widget/... или Google Maps).
 Для socialLinks: только настоящие https-ссылки; иначе опусти ключ.
 

@@ -4,7 +4,6 @@ import {
   getImageUrl,
   resolveImageProvider,
   toPollinationsImageUrl,
-  WIKIMEDIA_STATIC_FALLBACK_JPEG,
 } from "../services/imageGen.js";
 import { isPaymentSucceededForExport } from "../services/yookassa.js";
 import { renderTemplate } from "../services/template.js";
@@ -12,7 +11,8 @@ import { isLandingData } from "../validation.js";
 
 const router = Router();
 const EXPORT_IMAGE_TIMEOUT_MS = 7000;
-const STATIC_FALLBACK_IMAGE_URL = WIKIMEDIA_STATIC_FALLBACK_JPEG;
+const NEUTRAL_FALLBACK_IMAGE_URL =
+  "data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%201200%20700'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0'%20y1='0'%20x2='1'%20y2='1'%3E%3Cstop%20stop-color='%23111827'/%3E%3Cstop%20offset='1'%20stop-color='%23312e81'/%3E%3C/linearGradient%3E%3CradialGradient%20id='r'%20cx='50%25'%20cy='42%25'%20r='55%25'%3E%3Cstop%20stop-color='%23818cf8'%20stop-opacity='.32'/%3E%3Cstop%20offset='1'%20stop-color='%23818cf8'%20stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width='1200'%20height='700'%20fill='url(%23g)'/%3E%3Crect%20width='1200'%20height='700'%20fill='url(%23r)'/%3E%3Ctext%20x='50%25'%20y='50%25'%20text-anchor='middle'%20fill='%23eef2ff'%20font-family='Arial,sans-serif'%20font-size='42'%20font-weight='700'%3EAI%20preview%20image%3C/text%3E%3C/svg%3E";
 
 function allowMockPaidExport(): boolean {
   return process.env.NODE_ENV === "test" || process.env.ALLOW_EXPORT_MOCK_PAID === "true";
@@ -48,11 +48,11 @@ async function ensureRenderableImageUrl(url: string): Promise<string> {
       EXPORT_IMAGE_TIMEOUT_MS,
     );
     const contentType = (res.headers.get("content-type") || "").toLowerCase();
-    if (!res.ok) return STATIC_FALLBACK_IMAGE_URL;
-    if (!contentType.startsWith("image/")) return STATIC_FALLBACK_IMAGE_URL;
+    if (!res.ok) return NEUTRAL_FALLBACK_IMAGE_URL;
+    if (!contentType.startsWith("image/")) return NEUTRAL_FALLBACK_IMAGE_URL;
     return url;
   } catch {
-    return STATIC_FALLBACK_IMAGE_URL;
+    return NEUTRAL_FALLBACK_IMAGE_URL;
   }
 }
 
@@ -75,7 +75,7 @@ async function resolveFinalImageUrl(
       const pollinations = toPollinationsImageUrl(prompt, { width, height }, variation, landingSid);
       return await ensureRenderableImageUrl(pollinations);
     }
-    return STATIC_FALLBACK_IMAGE_URL;
+    return NEUTRAL_FALLBACK_IMAGE_URL;
   }
 }
 
@@ -90,7 +90,7 @@ async function replaceLocalImageSourcesForExport(html: string): Promise<string> 
     const srcValue = match[2] ?? "";
     if (urlMap.has(srcValue)) continue;
 
-    let finalUrl = STATIC_FALLBACK_IMAGE_URL;
+    let finalUrl = NEUTRAL_FALLBACK_IMAGE_URL;
     try {
       const parsed = new URL(srcValue, "http://localhost");
       const prompt = (parsed.searchParams.get("prompt") || "").trim() || "website section illustration";
@@ -108,14 +108,14 @@ async function replaceLocalImageSourcesForExport(html: string): Promise<string> 
       const height = Number.isFinite(h) ? h : 768;
       finalUrl = await resolveFinalImageUrl(prompt, width, height, variation, landingSid);
     } catch {
-      finalUrl = STATIC_FALLBACK_IMAGE_URL;
+      finalUrl = NEUTRAL_FALLBACK_IMAGE_URL;
     }
 
     urlMap.set(srcValue, finalUrl);
   }
 
   return html.replace(srcRegex, (_full, p1: string, srcValue: string, p3: string) => {
-    const resolved = urlMap.get(srcValue) ?? STATIC_FALLBACK_IMAGE_URL;
+    const resolved = urlMap.get(srcValue) ?? NEUTRAL_FALLBACK_IMAGE_URL;
     return `${p1}${resolved}${p3}`;
   });
 }

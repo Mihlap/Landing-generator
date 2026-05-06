@@ -5,6 +5,7 @@ const jsonHeaders = { "Content-Type": "application/json" };
 export type GenerateRequestOptions = {
   layoutMode?: "full" | "minimal";
   generateMode?: LandingGenerateMode;
+  signal?: AbortSignal;
 };
 
 export async function postGenerate(
@@ -15,6 +16,7 @@ export async function postGenerate(
   const res = await fetch("/generate", {
     method: "POST",
     headers: jsonHeaders,
+    signal: options?.signal,
     body: JSON.stringify({
       prompt,
       locale,

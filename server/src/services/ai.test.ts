@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  enforcePromptContactsAndMapForHtml,
   filterGalleryItemsForTemplate,
+  inferContactAddressFromPrompt,
+  inferContactPhoneFromPrompt,
   inferMinPricingCardsFromPrompt,
+  inferRequestedServiceCount,
   landingBuildMode,
   resolveLandingBuildMode,
   resolveSkinFromPrompt,
@@ -52,8 +56,60 @@ describe("inferMinPricingCardsFromPrompt", () => {
   });
 });
 
+describe("inferRequestedServiceCount", () => {
+  it("понимает категории и виды товаров как управляемые карточки каталога", () => {
+    expect(inferRequestedServiceCount("9 видов категорий игрушек и их изображения")).toBe(9);
+    expect(inferRequestedServiceCount("12 категорий товаров с фото")).toBe(12);
+    expect(inferRequestedServiceCount("8 услугами и изображениями к ним")).toBe(8);
+  });
+});
+
+describe("inferContactAddressFromPrompt", () => {
+  it("извлекает конкретный адрес из промпта", () => {
+    expect(
+      inferContactAddressFromPrompt(
+        "интернет-магазин игрушек, карта и контакты: адрес: Москва, ул. Тверская, 7, телефон +7 999",
+      ),
+    ).toBe("Москва, ул. Тверская, 7");
+    expect(
+      inferContactAddressFromPrompt("контакты: с конкретным адресом Москва, ул. Лавочкина, д. 32 и телефоном"),
+    ).toBe("Москва, ул. Лавочкина, д. 32");
+    expect(inferContactAddressFromPrompt("контакты: Москва, ул. Лавочкина, д. 34, тел 8 999 555 66 77")).toBe(
+      "Москва, ул. Лавочкина, д. 34",
+    );
+    expect(
+      inferContactAddressFromPrompt(
+        "Контакты: Киров, ул. Ленина, д. 7 и прикрепи карту с этим адресом",
+      ),
+    ).toBe("Киров, ул. Ленина, д. 7");
+    expect(inferContactAddressFromPrompt("контакты: с конкретным адресом")).toBeUndefined();
+  });
+});
+
+describe("inferContactPhoneFromPrompt", () => {
+  it("извлекает телефон из промпта", () => {
+    expect(inferContactPhoneFromPrompt("контакты: телефон +7 (999) 123-45-67")).toBe("+7 (999) 123-45-67");
+    expect(inferContactPhoneFromPrompt("без телефона")).toBeUndefined();
+  });
+});
+
+describe("enforcePromptContactsAndMapForHtml", () => {
+  it("переписывает карту на адрес из промпта и добавляет footer-контакты", () => {
+    const html = `<!doctype html><html><body><section><iframe src="https://yandex.ru/map-widget/v1/?ll=37.1,55.7&z=12"></iframe></section></body></html>`;
+    const out = enforcePromptContactsAndMapForHtml(
+      html,
+      "Контакты: Киров, ул. Ленина, д. 7, тел 8 999 111 22 33 и карта",
+      "ru",
+    );
+    expect(out).toContain("text=%D0%9A%D0%B8%D1%80%D0%BE%D0%B2");
+    expect(out).toContain("<footer");
+    expect(out).toContain("Адрес:");
+    expect(out).toContain("Телефон:");
+  });
+});
+
 describe("filterGalleryItemsForTemplate", () => {
-  it("для стоматологии отбрасывает сток авто (частая ошибка модели)", () => {
+  it("отбрасывает внешние stock-изображения модели", () => {
     const autoSrc =
       "https://images.unsplash.com/photo-1486262715619-567beee29d4f?auto=format&fit=crop&w=720&q=75";
     const out = filterGalleryItemsForTemplate(
@@ -63,9 +119,8 @@ describe("filterGalleryItemsForTemplate", () => {
     expect(out).toBeUndefined();
   });
 
-  it("оставляет релевантные unsplash dental из пула", () => {
-    const src =
-      "https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=720&q=75";
+  it("оставляет локальные AI-изображения", () => {
+    const src = "/image?prompt=dental%20clinic&w=520&h=390&prefer=gen";
     const out = filterGalleryItemsForTemplate([{ src, alt: "зубы" }], "dental");
     expect(out).toEqual([{ src, alt: "зубы" }]);
   });

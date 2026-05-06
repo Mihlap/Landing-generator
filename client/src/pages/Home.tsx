@@ -168,6 +168,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
+  const generateAbortRef = useRef<AbortController | null>(null);
 
   const closeExpandedPrompt = useCallback(() => setPromptExpanded(false), []);
   const openExpandedPrompt = useCallback(() => setPromptExpanded(true), []);
@@ -214,16 +215,31 @@ export default function Home() {
     };
   }, [closeExpandedPrompt, promptExpanded]);
 
+  useEffect(
+    () => () => {
+      generateAbortRef.current?.abort();
+      generateAbortRef.current = null;
+    },
+    [],
+  );
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    generateAbortRef.current?.abort();
+    const controller = new AbortController();
+    generateAbortRef.current = controller;
     try {
-      const data = await postGenerate(prompt.trim(), siteLocale, { generateMode });
+      const data = await postGenerate(prompt.trim(), siteLocale, { generateMode, signal: controller.signal });
       navigate("/editor", { state: { data } });
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Не удалось создать");
     } finally {
+      if (generateAbortRef.current === controller) {
+        generateAbortRef.current = null;
+      }
       setLoading(false);
     }
   }

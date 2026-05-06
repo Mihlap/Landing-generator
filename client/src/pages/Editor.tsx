@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { postExportHtml, postPreviewHtml } from "../api/generate";
 import { touchEditorPromoAnchor } from "../components/LabaPromo";
 import { LOCATION_FROM_EDITOR } from "../constants/navigation";
@@ -127,6 +127,14 @@ export default function Editor() {
     });
   }, [finishPreviewLoading]);
 
+  const handleBack = useCallback(() => {
+    if (iframeRef.current) {
+      iframeRef.current.srcdoc = "";
+      iframeRef.current.src = "about:blank";
+    }
+    navigate("/", { state: LOCATION_FROM_EDITOR });
+  }, [navigate]);
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-slate-800 bg-slate-950/90 backdrop-blur px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -151,13 +159,13 @@ export default function Editor() {
           >
             {exportLoading ? "Экспортируем..." : "Скачать HTML"}
           </button>
-          <Link
-            to="/"
-            state={LOCATION_FROM_EDITOR}
+          <button
+            type="button"
+            onClick={handleBack}
             className="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
           >
             ← Назад
-          </Link>
+          </button>
         </div>
       </header>
 

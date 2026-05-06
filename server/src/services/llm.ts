@@ -118,6 +118,7 @@ async function completeYandex(
   system: string,
   user: string,
   opts?: { maxTokens?: string },
+  signal?: AbortSignal,
 ): Promise<string> {
   const folder = process.env.YANDEX_CLOUD_FOLDER_ID!.trim();
   const modelUri =
@@ -128,6 +129,7 @@ async function completeYandex(
 
   const res = await fetch(YANDEX_COMPLETION_URL, {
     method: "POST",
+    signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: auth,
@@ -167,7 +169,9 @@ async function completeGigachat(
   system: string,
   user: string,
   opts?: { maxTokens?: number },
+  signal?: AbortSignal,
 ): Promise<string> {
+  if (signal?.aborted) throw new Error("Request aborted");
   const credentials = process.env.GIGACHAT_CREDENTIALS!.trim();
   const scope = process.env.GIGACHAT_SCOPE?.trim() || "GIGACHAT_API_PERS";
   const model = process.env.GIGACHAT_MODEL?.trim() || "GigaChat";
@@ -196,10 +200,12 @@ async function completeGigachat(
       ...(opts?.maxTokens ? { max_tokens: opts.maxTokens } : {}),
     });
   } catch (err) {
+    if (signal?.aborted) throw new Error("Request aborted");
     const details = stringifyUnknownError(err).slice(0, 600);
     throw new Error(`GigaChat request failed: ${details}`);
   }
 
+  if (!completion) throw new Error("GigaChat: пустой ответ модели");
   const text = completion.choices?.[0]?.message?.content?.trim() ?? "";
   if (!text) throw new Error("GigaChat: пустой ответ модели");
   return text;
@@ -209,6 +215,7 @@ async function completeOpenai(
   system: string,
   user: string,
   opts?: { maxTokens?: number },
+  signal?: AbortSignal,
 ): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY!.trim();
   const body: Record<string, unknown> = {
@@ -223,6 +230,7 @@ async function completeOpenai(
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
+    signal,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -247,6 +255,7 @@ async function completeZai(
   system: string,
   user: string,
   opts?: { maxTokens?: number },
+  signal?: AbortSignal,
 ): Promise<string> {
   const apiKey = (process.env.ZAI_API_KEY?.trim() || process.env.AI_ZZZ?.trim()) as string;
   const useCodingEndpoint = (process.env.ZAI_USE_CODING_ENDPOINT ?? "").trim().toLowerCase() === "true";
@@ -263,6 +272,7 @@ async function completeZai(
 
   const res = await fetch(endpoint, {
     method: "POST",
+    signal,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -288,16 +298,17 @@ export async function runLlmCompletion(
   provider: LlmProvider,
   system: string,
   user: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   switch (provider) {
     case "zai":
-      return completeZai(system, user);
+      return completeZai(system, user, undefined, signal);
     case "yandex":
-      return completeYandex(system, user);
+      return completeYandex(system, user, undefined, signal);
     case "gigachat":
-      return completeGigachat(system, user);
+      return completeGigachat(system, user, undefined, signal);
     case "openai":
-      return completeOpenai(system, user);
+      return completeOpenai(system, user, undefined, signal);
     default:
       throw new Error("Неизвестный LLM-провайдер");
   }
@@ -307,17 +318,18 @@ export async function runLlmLandingHtml(
   provider: LlmProvider,
   system: string,
   user: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const gigaMax = Number(process.env.LANDING_HTML_MAX_TOKENS) || 8000;
   switch (provider) {
     case "zai":
-      return completeZai(system, user, { maxTokens: 4096 });
+      return completeZai(system, user, { maxTokens: 4096 }, signal);
     case "yandex":
-      return completeYandex(system, user, { maxTokens: "4000" });
+      return completeYandex(system, user, { maxTokens: "4000" }, signal);
     case "gigachat":
-      return completeGigachat(system, user, { maxTokens: gigaMax });
+      return completeGigachat(system, user, { maxTokens: gigaMax }, signal);
     case "openai":
-      return completeOpenai(system, user, { maxTokens: 4096 });
+      return completeOpenai(system, user, { maxTokens: 4096 }, signal);
     default:
       throw new Error("Неизвестный LLM-провайдер");
   }

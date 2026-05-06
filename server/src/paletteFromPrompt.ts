@@ -9,6 +9,8 @@ const HEX_IN_TEXT =
   /#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g;
 
 const NAMED_COLOR_HINTS: { re: RegExp; hex: string }[] = [
+  { re: /красн|ал(ы|ый|ая)|scarlet|\bred\b|crimson/i, hex: "#dc2626" },
+  { re: /оранж|апельсин|orange/i, hex: "#f97316" },
   { re: /бордов|бордо|bordo|burgundy/i, hex: "#722f37" },
   { re: /золот|золотист|gold/i, hex: "#c5a059" },
   { re: /изумруд|emerald/i, hex: "#059669" },
@@ -27,6 +29,39 @@ const NAMED_COLOR_HINTS: { re: RegExp; hex: string }[] = [
   { re: /малинов|малина|raspberry/i, hex: "#db2777" },
   { re: /салатов|лайм|lime\s*green/i, hex: "#84cc16" },
   { re: /розов|\bpink\b/i, hex: "#ec4899" },
+];
+
+type FontHint = { re: RegExp; family: string; google?: string };
+const FONT_HINTS: FontHint[] = [
+  {
+    re: /\bmontserrat\b/i,
+    family: "'Montserrat', system-ui, sans-serif",
+    google: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap",
+  },
+  {
+    re: /\binter\b/i,
+    family: "'Inter', system-ui, sans-serif",
+    google: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+  },
+  {
+    re: /\broboto\b/i,
+    family: "'Roboto', system-ui, sans-serif",
+    google: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",
+  },
+  {
+    re: /\bopen\s*sans\b/i,
+    family: "'Open Sans', system-ui, sans-serif",
+    google: "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap",
+  },
+  {
+    re: /\bgeorgia\b/i,
+    family: "Georgia, 'Times New Roman', serif",
+  },
+  {
+    re: /арабск|восточн|arabic|oriental/i,
+    family: "'El Messiri', 'Amiri', Georgia, serif",
+    google: "https://fonts.googleapis.com/css2?family=El+Messiri:wght@400;500;600;700&display=swap",
+  },
 ];
 
 function normalizeHexToken(raw: string): string | null {
@@ -143,9 +178,12 @@ export function inferThemeVariablesFromPrompt(prompt: string): Partial<Record<La
     if (tint) {
       const g = sanitizeLandingThemeCssValue(`linear-gradient(180deg, ${tint} 0%, #ffffff 55%)`);
       if (g) out["--lp-hero-bg"] = g;
+      const page = sanitizeLandingThemeCssValue(`linear-gradient(180deg, ${tint} 0%, #ffffff 68%)`);
+      if (page) out["--lp-page-bg"] = page;
+    } else {
+      const pg = sanitizeLandingThemeCssValue(`linear-gradient(180deg, #fafafa 0%, #ffffff 50%)`);
+      if (pg) out["--lp-page-bg"] = pg;
     }
-    const pg = sanitizeLandingThemeCssValue(`linear-gradient(180deg, #fafafa 0%, #ffffff 50%)`);
-    if (pg) out["--lp-page-bg"] = pg;
   }
 
   const used = new Set([accent.toLowerCase(), pageBg?.toLowerCase()].filter(Boolean) as string[]);
@@ -164,6 +202,7 @@ export function inferThemeVariablesFromPrompt(prompt: string): Partial<Record<La
 export function mergeThemeWithPromptColors(coreTheme: unknown, prompt: string): LandingTheme | undefined {
   const model = sanitizeLandingTheme(coreTheme);
   const inferred = inferThemeVariablesFromPrompt(prompt);
+  const fontHint = FONT_HINTS.find((f) => f.re.test(prompt));
   const mergedVars: Partial<Record<LandingThemeVarKey, string>> = {
     ...(model?.variables ?? {}),
     ...inferred,
@@ -171,8 +210,10 @@ export function mergeThemeWithPromptColors(coreTheme: unknown, prompt: string): 
 
   const payload: Record<string, unknown> = {};
   if (Object.keys(mergedVars).length) payload.variables = mergedVars;
-  if (model?.fontFamily) payload.fontFamily = model.fontFamily;
-  if (model?.fontLinkHref) payload.fontLinkHref = model.fontLinkHref;
+  if (fontHint?.family) payload.fontFamily = fontHint.family;
+  else if (model?.fontFamily) payload.fontFamily = model.fontFamily;
+  if (fontHint?.google) payload.fontLinkHref = fontHint.google;
+  else if (model?.fontLinkHref) payload.fontLinkHref = model.fontLinkHref;
 
   if (Object.keys(payload).length === 0) return undefined;
   return sanitizeLandingTheme(payload);

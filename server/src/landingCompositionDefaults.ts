@@ -1,17 +1,13 @@
 import type { SectionKind, SiteLocale, SkinId } from "./services/ai.js";
 import type { TemplateId } from "./templateId.js";
 
-const DEFAULT_SECTION_ORDER: SectionKind[] = [
-  "hero",
-  "benefits",
-  "services",
-  "pricing",
-  "reviews",
-  "process",
-  "faq",
-  "cta",
-  "footer",
-];
+const SECTION_ORDER_BY_TEMPLATE: Record<TemplateId, SectionKind[]> = {
+  dental: ["hero", "benefits", "services", "process", "reviews", "pricing", "faq", "cta", "map", "footer"],
+  auto: ["hero", "services", "benefits", "process", "pricing", "reviews", "faq", "gallery", "map", "cta", "footer"],
+  repair: ["hero", "benefits", "services", "pricing", "process", "faq", "reviews", "cta", "map", "footer"],
+  realestate: ["hero", "benefits", "process", "services", "gallery", "reviews", "pricing", "faq", "cta", "map", "footer"],
+  ecommerce: ["hero", "benefits", "gallery", "services", "pricing", "reviews", "faq", "cta", "footer"],
+};
 
 function skinByVertical(templateId: TemplateId): SkinId {
   const map: Record<TemplateId, SkinId> = {
@@ -36,7 +32,7 @@ export type CompositionDefaults = {
 const ru: Record<TemplateId, CompositionDefaults> = {
   dental: {
     skinId: skinByVertical("dental"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.dental],
     benefits: [
       { title: "Опытные врачи", text: "Аккуратное лечение и понятный план без лишних процедур." },
       { title: "Современное оборудование", text: "Диагностика и лечение на актуальном парке аппаратов." },
@@ -71,7 +67,7 @@ const ru: Record<TemplateId, CompositionDefaults> = {
   },
   auto: {
     skinId: skinByVertical("auto"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.auto],
     benefits: [
       { title: "Честная смета", text: "Согласуем работы и запчасти до начала ремонта." },
       { title: "Гарантия", text: "На выполненные работы — по договору." },
@@ -94,7 +90,7 @@ const ru: Record<TemplateId, CompositionDefaults> = {
   },
   repair: {
     skinId: skinByVertical("repair"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.repair],
     benefits: [
       { title: "Выезд в удобное время", text: "Согласуем окно приезда мастера." },
       { title: "Прозрачная цена", text: "Оценка до начала работ, без скрытых доплат." },
@@ -117,7 +113,7 @@ const ru: Record<TemplateId, CompositionDefaults> = {
   },
   realestate: {
     skinId: skinByVertical("realestate"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.realestate],
     benefits: [
       { title: "Проверка объектов", text: "Юридическая чистота и риски до сделки." },
       { title: "Сопровождение", text: "От подбора до передачи ключей." },
@@ -140,7 +136,7 @@ const ru: Record<TemplateId, CompositionDefaults> = {
   },
   ecommerce: {
     skinId: skinByVertical("ecommerce"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.ecommerce],
     benefits: [
       { title: "Быстрая доставка", text: "Отправляем в согласованные сроки." },
       { title: "Возврат", text: "Понятные условия и поддержка." },
@@ -166,7 +162,7 @@ const ru: Record<TemplateId, CompositionDefaults> = {
 const en: Record<TemplateId, CompositionDefaults> = {
   dental: {
     skinId: skinByVertical("dental"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.dental],
     benefits: [
       { title: "Experienced team", text: "Clear treatment plan without unnecessary procedures." },
       { title: "Modern equipment", text: "Diagnostics and care with up-to-date tools." },
@@ -189,7 +185,7 @@ const en: Record<TemplateId, CompositionDefaults> = {
   },
   auto: {
     skinId: skinByVertical("auto"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.auto],
     benefits: [
       { title: "Clear estimates", text: "We align parts and labor before work starts." },
       { title: "Warranty", text: "Coverage on qualified repairs." },
@@ -212,7 +208,7 @@ const en: Record<TemplateId, CompositionDefaults> = {
   },
   repair: {
     skinId: skinByVertical("repair"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.repair],
     benefits: [
       { title: "On-site visits", text: "We schedule a window that fits you." },
       { title: "Upfront pricing", text: "Estimate before work begins." },
@@ -235,7 +231,7 @@ const en: Record<TemplateId, CompositionDefaults> = {
   },
   realestate: {
     skinId: skinByVertical("realestate"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.realestate],
     benefits: [
       { title: "Due diligence", text: "We highlight risks before you commit." },
       { title: "End-to-end", text: "From search to keys." },
@@ -258,7 +254,7 @@ const en: Record<TemplateId, CompositionDefaults> = {
   },
   ecommerce: {
     skinId: skinByVertical("ecommerce"),
-    sections: [...DEFAULT_SECTION_ORDER],
+    sections: [...SECTION_ORDER_BY_TEMPLATE.ecommerce],
     benefits: [
       { title: "Fast shipping", text: "We ship on agreed timelines." },
       { title: "Returns", text: "Clear policies and support." },

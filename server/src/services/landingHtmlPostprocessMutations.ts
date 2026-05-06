@@ -1,8 +1,14 @@
 import type { ImagePreference } from "./landingHtmlPostprocessTypes.js";
-import { FALLBACK_IMAGE_SRC, INLINE_IMAGE_FALLBACK, toLocalImageUrl } from "./landingHtmlPostprocessImageUrl.js";
+import { INLINE_IMAGE_FALLBACK, toLocalImageUrl } from "./landingHtmlPostprocessImageUrl.js";
 
 export function stripUnsafeHrefs(html: string): string {
   return html.replace(/\shref\s*=\s*(["'])javascript:[^"']*\1/gi, ' href="#"');
+}
+
+export function stripInlineSvg(html: string): string {
+  const withoutPaired = html.replace(/<svg\b[\s\S]*?<\/svg>/gi, "");
+  const withoutSelfClosing = withoutPaired.replace(/<svg\b[^>]*\/>/gi, "");
+  return withoutSelfClosing.replace(/\n{3,}/g, "\n\n");
 }
 export function escapeAttr(s: string): string {
   return s
@@ -17,7 +23,7 @@ export function regionHasRenderableImg(region: string): boolean {
   let m: RegExpExecArray | null;
   while ((m = re.exec(region)) !== null) {
     const src = m[2]?.trim() ?? "";
-    if (/^https?:\/\//i.test(src) || /^\/image\?/i.test(src) || /^data:image\//i.test(src)) return true;
+    if (/^https?:\/\//i.test(src) || /^\/image\?/i.test(src)) return true;
   }
   return false;
 }
@@ -28,7 +34,7 @@ export function countRenderableImgTags(html: string): number {
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
     const src = m[2]?.trim() ?? "";
-    if (/^https?:\/\//i.test(src) || /^\/image\?/i.test(src) || /^data:image\//i.test(src)) n++;
+    if (/^https?:\/\//i.test(src) || /^\/image\?/i.test(src)) n++;
   }
   return n;
 }
@@ -91,14 +97,10 @@ export function ensureImageTagsHaveSource(html: string): string {
     const srcValue = srcMatch?.[2]?.trim() ?? "";
     const dataSrcValue = dataSrcMatch?.[2]?.trim() ?? "";
     const preferred = srcValue || dataSrcValue;
-    if (!/^(https?:\/\/|data:image\/|\/image\?)/i.test(preferred)) {
+    if (!/^(https?:\/\/|\/image\?)/i.test(preferred)) {
       return "";
     }
     let resolvedSrc = preferred;
-  
-    if (/^data:image\//i.test(resolvedSrc) && resolvedSrc.length > 2048) {
-      resolvedSrc = FALLBACK_IMAGE_SRC;
-    }
 
     let updated = tag;
     if (srcMatch) {
@@ -107,7 +109,7 @@ export function ensureImageTagsHaveSource(html: string): string {
       updated = updated.replace(/<img/i, `<img src="${resolvedSrc}"`);
     }
     if (!/\sloading\s*=/i.test(updated)) {
-      updated = updated.replace(/<img/i, '<img loading="eager"');
+      updated = updated.replace(/<img/i, '<img loading="lazy"');
     }
     if (!/\sdecoding\s*=/i.test(updated)) {
       updated = updated.replace(/<img/i, '<img decoding="async"');
@@ -174,10 +176,6 @@ export function ensureFooterNewsletterForm(html: string): string {
     if (!/type\s*=\s*["']email["']/i.test(inner)) return full;
     return `<footer${attrs}><form id="newsletter-form" class="landing-newsletter-form" method="get" action="#">${inner}</form></footer>`;
   });
-}
-
-function shouldReplaceStockWithAi(): boolean {
-  return process.env.LANDING_REPLACE_STOCK_WITH_AI?.trim().toLowerCase() === "true";
 }
 
 export function fillEmptyImagePlaceholders(html: string): string {

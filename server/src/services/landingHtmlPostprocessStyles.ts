@@ -126,6 +126,9 @@ section {
   padding-block: clamp(1.75rem, 3.5vw, 3.75rem);
   padding-inline: clamp(1rem, 3vw, 1.5rem);
 }
+section > * + * {
+  margin-top: clamp(0.75rem, 1.8vw, 1.25rem);
+}
 main section + section,
 body > main > section + section,
 body > section + section {
@@ -152,6 +155,16 @@ iframe {
   width: 100%;
   min-height: 280px;
   border: 0;
+  display: block;
+  margin-inline: auto;
+}
+.map-container,
+[class*="map-container" i],
+section[id*="map" i],
+section[class*="map" i] {
+  width: 100%;
+  max-width: ${LANDING_CONTENT_WIDTH};
+  margin-inline: auto;
 }
 [data-landing-hero-image="1"] {
   width: ${LANDING_CONTENT_WIDTH};
@@ -227,7 +240,8 @@ section.benefits svg[class*="benefit" i][class*="icon" i] {
 }
 section.benefits > h2,
 section.gallery > h2,
-section.reviews > h2 {
+section.reviews > h2,
+section.review > h2 {
   text-align: center !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -237,12 +251,14 @@ section.reviews > h2 {
   padding-inline: clamp(0.5rem, 2.5vw, 1rem) !important;
   box-sizing: border-box !important;
 }
-section.reviews {
+section.reviews,
+section.review {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
 }
-section.reviews [class*="grid"] {
+section.reviews [class*="grid"],
+section.review [class*="grid"] {
   display: grid !important;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)) !important;
   gap: clamp(1.15rem, 2.4vw, 1.75rem) !important;
@@ -251,14 +267,16 @@ section.reviews [class*="grid"] {
   max-width: 100% !important;
   align-items: stretch !important;
 }
-section.reviews [class*="grid"] > * {
+section.reviews [class*="grid"] > *,
+section.review [class*="grid"] > * {
   min-width: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
   transform: none !important;
 }
-section.reviews [class*="grid"] > *:hover {
+section.reviews [class*="grid"] > *:hover,
+section.review [class*="grid"] > *:hover {
   transform: translateY(-3px) !important;
 }
 section .reviews {
@@ -294,7 +312,10 @@ section .reviews > .review-card:hover {
 }
 section.reviews > .review,
 section.reviews > article,
-section.reviews > .review-card {
+section.reviews > .review-card,
+section.review > .review,
+section.review > article,
+section.review > .review-card {
   min-width: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -304,7 +325,10 @@ section.reviews > .review-card {
 }
 section.reviews > .review:hover,
 section.reviews > article:hover,
-section.reviews > .review-card:hover {
+section.reviews > .review-card:hover,
+section.review > .review:hover,
+section.review > article:hover,
+section.review > .review-card:hover {
   transform: translateY(-3px) !important;
 }
 section.benefits [class*="grid"] > .benefit-card,
@@ -333,268 +357,144 @@ ${FOOTER_ICON_SVG_FIX}
 </style>`;
 export const STRUCTURE_STYLE = `<style ${STRUCTURE_MARKER}="1">
 ${LANDING_ROOT_VARS}
-main, section, .container {
-  width: ${LANDING_CONTENT_WIDTH} !important;
-  max-width: ${LANDING_CONTENT_WIDTH} !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  box-sizing: border-box;
-}
-header {
-  width: 100%;
-  margin-left: 0;
-  margin-right: 0;
-}
-header nav,
-header .nav,
-header [class*="nav"] {
-  width: 100% !important;
-  max-width: none !important;
-  background: transparent !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-header > *:not(style):not(script) {
-  width: ${LANDING_CONTENT_WIDTH} !important;
-  max-width: ${LANDING_CONTENT_WIDTH} !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
-footer {
-  align-self: stretch;
-  width: ${LANDING_CONTENT_WIDTH} !important;
-  max-width: ${LANDING_CONTENT_WIDTH} !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  box-sizing: border-box;
-}
+html, body { max-width: 100%; overflow-x: hidden; }
+main, section { box-sizing: border-box; }
+header { width: 100%; }
 section {
-  padding-top: clamp(1.25rem, 3vw, 2rem);
-  padding-bottom: clamp(1.25rem, 3vw, 2rem);
-  padding-left: clamp(1rem, 3vw, 1.5rem);
-  padding-right: clamp(1rem, 3vw, 1.5rem);
+  padding-block: clamp(1.5rem, 3vw, 2.5rem);
+  padding-inline: clamp(1rem, 3vw, 1.5rem);
+}
+section > * + * {
+  margin-top: clamp(0.75rem, 1.8vw, 1.25rem);
+}
+main section + section,
+body > main > section + section,
+body > section + section {
+  margin-top: clamp(0.75rem, 1.5vw, 1.25rem);
+}
+header + main,
+header + section,
+[data-landing-hero-image="1"] + main,
+[data-landing-hero-image="1"] + section {
+  margin-top: clamp(0.9rem, 2vw, 1.4rem);
+}
+[data-landing-hero-image="1"] {
+  margin-bottom: clamp(0.9rem, 2vw, 1.4rem);
 }
 [data-landing-title-fix="1"] > div:first-child,
 section[class*="hero" i] > div:first-child {
-  padding-left: clamp(.5rem, 2vw, 1.25rem);
-  padding-right: clamp(.5rem, 2vw, 1.25rem);
+  padding-inline: clamp(.5rem, 2vw, 1rem);
 }
 section ul:not(nav ul):not(header ul) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: .85rem;
+  gap: 1rem;
   list-style: none;
   padding-left: 0;
 }
 section .cards, section .grid, section .services, section .reviews, section .benefits, section .process {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
 }
 section [class*="list"],
 section [class*="cards"],
-section [class*="grid"],
-section [class*="container"]:not([class*="icon"]) {
-  display: grid;
-  gap: clamp(.85rem, 2vw, 1.25rem);
-}
-section > [class*="grid"] {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)) !important;
-}
-section.benefits,
-section.gallery,
-section[class*="feature" i]:not([class*="hero" i]) {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-}
-section.benefits [class*="grid"],
-section.gallery [class*="grid"] {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)) !important;
-  gap: clamp(1rem, 2.2vw, 1.75rem) !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  align-items: stretch !important;
-}
-section.benefits .benefit-card,
-section.benefits .benefits-card,
-section.benefits [class*="grid"] > *,
-section.gallery [class*="grid"] > * {
-  min-width: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}
-section.benefits .icon-container {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  width: fit-content !important;
-  max-width: 100% !important;
-}
-section.benefits .icon-container svg,
-section.benefits svg.icon,
-section.benefits svg[class*="benefit" i][class*="icon" i] {
-  width: 2.5rem !important;
-  height: 2.5rem !important;
-  max-width: 2.75rem !important;
-  max-height: 2.75rem !important;
-  flex-shrink: 0 !important;
-  display: block !important;
+section [class*="grid"] {
+  gap: clamp(1rem, 2vw, 1.5rem);
 }
 section.benefits > h2,
 section.gallery > h2,
-section.reviews > h2 {
-  text-align: center !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  margin-bottom: clamp(0.65rem, 2vw, 1.1rem) !important;
-  padding-inline: clamp(0.5rem, 2.5vw, 1rem) !important;
-  box-sizing: border-box !important;
+section.reviews > h2,
+section.review > h2,
+section[data-lp="reviews"] > h2 {
+  text-align: center;
+  margin-bottom: clamp(0.75rem, 2vw, 1.2rem);
 }
-section.reviews {
+section.benefits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+section.benefits > h1,
+section.benefits > h2,
+section.benefits > h3 {
+  grid-column: 1 / -1;
+}
+section.benefits .benefits-grid,
+section.benefits [class*="benefits-grid"],
+section.benefits [class*="cards"],
+section.benefits [class*="grid"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+section.reviews,
+section.review,
+section[data-lp="reviews"] {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
+  gap: clamp(1rem, 2vw, 1.5rem) !important;
 }
-section.reviews [class*="grid"] {
+section.reviews > h1,
+section.reviews > h2,
+section.reviews > h3,
+section.review > h1,
+section.review > h2,
+section.review > h3,
+section[data-lp="reviews"] > h1,
+section[data-lp="reviews"] > h2,
+section[data-lp="reviews"] > h3 {
+  grid-column: 1 / -1;
+  margin: 0 0 clamp(0.75rem, 2vw, 1.2rem);
+}
+section.reviews .reviews-grid,
+section.reviews [class*="reviews-grid"],
+section.reviews [class*="review-grid"],
+section.reviews [class*="cards"],
+section.reviews [class*="grid"],
+section.review .reviews-grid,
+section.review [class*="reviews-grid"],
+section.review [class*="review-grid"],
+section.review [class*="cards"],
+section.review [class*="grid"],
+section[data-lp="reviews"] .reviews-grid,
+section[data-lp="reviews"] [class*="reviews-grid"],
+section[data-lp="reviews"] [class*="review-grid"],
+section[data-lp="reviews"] [class*="cards"],
+section[data-lp="reviews"] [class*="grid"] {
   display: grid !important;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)) !important;
-  gap: clamp(1.15rem, 2.4vw, 1.75rem) !important;
-  row-gap: clamp(1.25rem, 2.5vw, 1.85rem) !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  align-items: stretch !important;
+  gap: clamp(1rem, 2vw, 1.5rem) !important;
+  row-gap: clamp(1rem, 2vw, 1.5rem) !important;
 }
-section.reviews [class*="grid"] > * {
-  min-width: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-  transform: none !important;
-}
-section.reviews [class*="grid"] > *:hover {
-  transform: translateY(-3px) !important;
-}
-section .reviews {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)) !important;
-  gap: clamp(1.15rem, 2.4vw, 1.75rem) !important;
-  row-gap: clamp(1.25rem, 2.5vw, 1.85rem) !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  align-items: stretch !important;
-}
-section .reviews > h1,
-section .reviews > h2,
-section .reviews > h3 {
-  grid-column: 1 / -1 !important;
-  justify-self: stretch;
-  width: 100% !important;
-  max-width: 100% !important;
-}
-section .reviews > .review,
-section .reviews > article,
-section .reviews > .review-card {
-  min-width: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-  transform: none !important;
-}
-section .reviews > .review:hover,
-section .reviews > article:hover,
-section .reviews > .review-card:hover {
-  transform: translateY(-3px) !important;
-}
-section.reviews > .review,
-section.reviews > article,
-section.reviews > .review-card {
-  min-width: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  flex: 0 0 auto !important;
-  align-self: stretch !important;
-  transform: none !important;
-}
-section.reviews > .review:hover,
-section.reviews > article:hover,
-section.reviews > .review-card:hover {
-  transform: translateY(-3px) !important;
-}
-section.benefits [class*="grid"] > .benefit-card,
-section.benefits [class*="grid"] > article {
-  transform: none !important;
-}
-section.benefits [class*="grid"] > .benefit-card:hover,
-section.benefits [class*="grid"] > article:hover {
-  transform: translateY(-3px) !important;
-}
-@media (min-width: 768px) {
-  section.reviews > .review,
-  section.reviews > article,
-  section.reviews > .review-card {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-  }
-}
-@media (max-width: 767px) {
-  section.reviews {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: clamp(1.15rem, 2.4vw, 1.75rem) !important;
-  }
-}
-section.reviews > :not(style):not(script) + :not(style):not(script) {
-  margin-top: 0 !important;
-}
-section.reviews > h2 {
-  margin-top: 0 !important;
-}
-section [class*="list"] > *,
-section [class*="cards"] > *,
-section [class*="grid"] > *,
-section [class*="container"]:not([class*="icon"]) > * {
-  margin: 0;
-}
-section > :not(style):not(script) + :not(style):not(script) {
-  margin-top: clamp(.85rem, 2vw, 1.25rem);
-}
-section > div:has(> img + img),
-section > div:has(> figure + figure),
-section > div:has(> .card + .card),
-section > div:has(> [class*="card"] + [class*="card"]) {
+section.reviews > .reviews,
+section.review > .reviews,
+section[data-lp="reviews"] > .reviews {
   display: grid;
-  gap: clamp(.85rem, 2vw, 1.25rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
 }
-section:not(.reviews) .review,
-section .review-card,
-section .benefit-card,
-section .benefits-card,
-section .product-card,
-section .service-card,
-section .faq-item {
-  margin: 0;
-}
-section.reviews > .review,
-section.reviews > article,
-section.reviews > .review-card {
-  margin-block: 0 !important;
-}
-section .review-card + .review-card,
-section .card + .card,
-section [class*="card"] + [class*="card"] {
-  margin-top: clamp(.85rem, 2vw, 1.25rem);
+section.reviews > .review + .review,
+section.reviews > .review-card + .review-card,
+section.reviews > article + article,
+section.review > .review + .review,
+section.review > .review-card + .review-card,
+section.review > article + article,
+section[data-lp="reviews"] > .review + .review,
+section[data-lp="reviews"] > .review-card + .review-card,
+section[data-lp="reviews"] > article + article,
+section[data-lp="reviews"] .reviews > .review + .review,
+section[data-lp="reviews"] .reviews > .review-card + .review-card,
+section[data-lp="reviews"] .reviews > article + article {
+  margin-top: clamp(1rem, 2vw, 1.5rem);
 }
 footer form,
 section[id*="footer" i] form,
 section[class*="footer" i] form {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
   gap: .75rem;
 }
 footer form > *,
@@ -628,12 +528,6 @@ section[class*="footer" i] form select + button {
   }
 }
 ${FOOTER_ICON_SVG_FIX}
-section .card:not(:has(.content)),
-section [class*="card"]:not(:has(.content)):not(:has(> img:only-child)),
-section .review:not(:has(.content)) {
-  padding: clamp(1rem, 2.5vw, 1.35rem);
-  box-sizing: border-box;
-}
 section .service-card,
 section .review-card,
 section .benefit-card,
@@ -642,8 +536,9 @@ section .product-card,
 section .grid-item,
 section .faq-item,
 section .review {
-  padding: clamp(1rem, 2.5vw, 1.35rem) !important;
+  padding: clamp(1rem, 2.5vw, 1.35rem);
   box-sizing: border-box;
+  margin: 0;
 }
 img { display: block; max-width: 100%; height: auto; border-radius: 12px; }
 *, *::before, *::after { box-sizing: border-box; }
@@ -689,71 +584,83 @@ section[class*="hero" i] .hero-content {
 }
 [data-landing-title-fix="1"] > div:first-child,
 section[class*="hero" i] > div:first-child {
-  text-align: center !important;
+  text-align: center;
 }
 [data-landing-title-fix="1"] h1,
 [data-landing-title-fix="1"] p,
 [data-landing-title-fix="1"] button {
-  text-align: center !important;
+  text-align: center;
 }
 [class*="hero" i] .hero-content,
 header[class*="hero" i] .hero-content {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: clamp(0.65rem, 2vw, 1.25rem) !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.65rem, 2vw, 1.25rem);
   width: 100%;
   max-width: 100%;
+  padding-inline: clamp(0.75rem, 2.2vw, 1.5rem);
   box-sizing: border-box;
 }
 [class*="hero" i] .hero-content > h1,
 [class*="hero" i] .hero-content > p {
   width: 100%;
   max-width: min(42rem, 100%);
-  margin-left: auto !important;
-  margin-right: auto !important;
+  margin-left: auto;
+  margin-right: auto;
 }
 [class*="hero" i] .hero-content > .cta-button,
 [class*="hero" i] .hero-content > button {
   width: auto;
   max-width: 100%;
-  margin-left: auto !important;
-  margin-right: auto !important;
+  margin-left: auto;
+  margin-right: auto;
 }
 [data-landing-visuals="1"] {
-  width: ${LANDING_CONTENT_WIDTH};
-  margin: 1rem auto 0;
+  width: min(100%, ${LANDING_CONTENT_WIDTH});
+  margin: 1.25rem auto 0;
   display: grid;
-  gap: .9rem;
+  gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 @media (max-width: 1024px) {
   section {
-    padding-left: clamp(0.65rem, 2.5vw, 1rem) !important;
-    padding-right: clamp(0.65rem, 2.5vw, 1rem) !important;
+    padding-inline: clamp(0.75rem, 2.5vw, 1rem);
   }
   section ul:not(nav ul):not(header ul),
   section .cards, section .grid, section .services, section .reviews, section .benefits, section .process {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)) !important;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   }
 }
 @media (max-width: 767px) {
   html { -webkit-text-size-adjust: 100%; }
   section ul:not(nav ul):not(header ul),
   section .cards, section .grid, section .services, section .reviews, section .benefits, section .process {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
   }
-  section [class*="list"]:not(nav *):not(header *),
-  section [class*="cards"],
-  section [class*="grid"]:not(.container) {
-    grid-template-columns: 1fr !important;
+  section.benefits .benefits-grid,
+  section.benefits [class*="benefits-grid"],
+  section.reviews,
+  section.review,
+  section.reviews .reviews-grid,
+  section.reviews [class*="reviews-grid"],
+  section.reviews [class*="review-grid"],
+  section.review .reviews-grid,
+  section.review [class*="reviews-grid"],
+  section.review [class*="review-grid"],
+  section[data-lp="reviews"],
+  section[data-lp="reviews"] .reviews,
+  section[data-lp="reviews"] .reviews-grid,
+  section[data-lp="reviews"] [class*="reviews-grid"],
+  section[data-lp="reviews"] [class*="review-grid"] {
+    grid-template-columns: 1fr;
   }
   [data-landing-title-fix="1"],
   header[class*="hero" i],
   section[class*="hero" i],
   div[class*="hero" i] {
-    flex-direction: column !important;
+    flex-direction: column;
   }
 }
 [data-landing-visuals="1"] img {
@@ -849,6 +756,7 @@ form {
   border: 1px solid rgba(148,163,184,.28);
   box-shadow: 0 16px 40px -30px rgba(15,23,42,.45);
 }
+form > * + * { margin-top: .7rem; }
 form label { display: block; margin: 0 0 .35rem; font-size: .92rem; opacity: .86; }
 form input, form textarea, form select {
   width: 100%;
@@ -876,6 +784,7 @@ form button[type="submit"] {
   color: #fff;
   background: linear-gradient(135deg, #4f46e5, #2563eb);
   cursor: pointer;
+  margin-top: .35rem;
 }
 form button[type="submit"]:hover { filter: brightness(1.05); }
 </style>`;
