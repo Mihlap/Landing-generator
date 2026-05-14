@@ -219,6 +219,7 @@ REVIEWS:
 - конкретная деталь в отзыве ("за 3 недели", "рост на 27%", "после 5 занятий")
 - эмоциональная формулировка живым языком (не шаблон "всё понравилось")
 - подпись: имя, роль/город
+- список карточек: div.reviews-grid с display:grid и gap, либо карточки — прямые дети section.reviews (не несколько .review подряд во вложенном блоке без gap)
 
 CTA:
 - отдельный блок с другим фоном (цветным или градиентом)
@@ -299,7 +300,11 @@ ${mapEmbedInstructions(mapProvider)}
    - удобные зоны нажатия (min-height: 44px)
    - кнопки на всю ширину
 
-Google Fonts: в href имя семьи из двух слов через + (Cormorant+Garamond), без двоеточия внутри.
+Google Fonts (проверь href перед ответом):
+   - URL начинается с https://fonts.googleapis.com/css2?family= (после «css2» обязателен символ «?», не пробел).
+   - Несколько семейств: …&family=Второй+Шрифт:wght@400;700&display=swap
+   - Имя из нескольких слов в параметре family — через + (Cormorant+Garamond), без двоеточия внутри имени.
+   - Неверно (ломает загрузку шрифтов): …/css2 family=… или …/css2&family=… без «?» после css2.
 В <style> пиши @media на верхнем уровне, НЕ вкладывай их внутрь других селекторов — это ломает CSS в старых браузерах.
 Не используй SCSS-синтаксис: нет &, нет вложенных селекторов. Пиши плоский CSS.
 Хиро: обёртка .hero-content или аналогичная с display:flex, flex-direction:column, align-items:center, gap.
@@ -712,7 +717,7 @@ export function systemPrompt(locale: SiteLocale): string {
 - первый цвет (обычно основной) → --lp-accent
 - второй (если есть) → --lp-page-bg или --lp-hero-bg
 
-Если указан шрифт (название семейства) — задай theme.fontFamily (стек: 'Название', system-ui, sans-serif) и theme.fontLinkHref (Google Fonts URL).
+Если указан шрифт (название семейства) — задай theme.fontFamily (стек: 'Название', system-ui, sans-serif) и theme.fontLinkHref (Google Fonts URL: https://fonts.googleapis.com/css2?family=…&display=swap — после css2 только «?», не пробел).
 
 Допустимые ключи theme.variables (все опциональны):
 --lp-page-bg, --lp-page-fg, --lp-muted, --lp-surface, --lp-surface-alt,

@@ -31,10 +31,15 @@ export async function postGenerate(
   return res.json() as Promise<LandingData>;
 }
 
-export async function postPreviewHtml(data: LandingData): Promise<string> {
+export type PostPreviewOptions = {
+  signal?: AbortSignal;
+};
+
+export async function postPreviewHtml(data: LandingData, options?: PostPreviewOptions): Promise<string> {
   const res = await fetch("/preview", {
     method: "POST",
     headers: jsonHeaders,
+    signal: options?.signal,
     body: JSON.stringify({ data }),
   });
   if (!res.ok) {

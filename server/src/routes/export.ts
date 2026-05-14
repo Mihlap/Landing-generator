@@ -90,7 +90,7 @@ async function replaceLocalImageSourcesForExport(html: string): Promise<string> 
     const srcValue = match[2] ?? "";
     if (urlMap.has(srcValue)) continue;
 
-    let finalUrl = NEUTRAL_FALLBACK_IMAGE_URL;
+    let finalUrl = srcValue;
     try {
       const parsed = new URL(srcValue, "http://localhost");
       const prompt = (parsed.searchParams.get("prompt") || "").trim() || "website section illustration";
@@ -106,16 +106,17 @@ async function replaceLocalImageSourcesForExport(html: string): Promise<string> 
           : 0;
       const width = Number.isFinite(w) ? w : 1024;
       const height = Number.isFinite(h) ? h : 768;
-      finalUrl = await resolveFinalImageUrl(prompt, width, height, variation, landingSid);
+      const resolved = await resolveFinalImageUrl(prompt, width, height, variation, landingSid);
+      finalUrl = resolved === NEUTRAL_FALLBACK_IMAGE_URL ? srcValue : resolved;
     } catch {
-      finalUrl = NEUTRAL_FALLBACK_IMAGE_URL;
+      finalUrl = srcValue;
     }
 
     urlMap.set(srcValue, finalUrl);
   }
 
   return html.replace(srcRegex, (_full, p1: string, srcValue: string, p3: string) => {
-    const resolved = urlMap.get(srcValue) ?? NEUTRAL_FALLBACK_IMAGE_URL;
+    const resolved = urlMap.get(srcValue) ?? srcValue;
     return `${p1}${resolved}${p3}`;
   });
 }

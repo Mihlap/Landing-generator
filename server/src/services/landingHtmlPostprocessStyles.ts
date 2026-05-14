@@ -424,6 +424,10 @@ section.benefits .benefits-grid,
 section.benefits [class*="benefits-grid"],
 section.benefits [class*="cards"],
 section.benefits [class*="grid"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: clamp(1rem, 2vw, 1.5rem);
@@ -499,14 +503,23 @@ section[data-lp="reviews"] > .reviews {
   gap: clamp(1rem, 2vw, 1.5rem);
 }
 section.reviews > .review + .review,
+section.reviews .review + .review,
 section.reviews > .review-card + .review-card,
+section.reviews .review-card + .review-card,
 section.reviews > article + article,
+section.reviews article + article,
 section.review > .review + .review,
+section.review .review + .review,
 section.review > .review-card + .review-card,
+section.review .review-card + .review-card,
 section.review > article + article,
+section.review article + article,
 section[data-lp="reviews"] > .review + .review,
+section[data-lp="reviews"] .review + .review,
 section[data-lp="reviews"] > .review-card + .review-card,
+section[data-lp="reviews"] .review-card + .review-card,
 section[data-lp="reviews"] > article + article,
+section[data-lp="reviews"] article + article,
 section[data-lp="reviews"] .reviews > .review + .review,
 section[data-lp="reviews"] .reviews > .review-card + .review-card,
 section[data-lp="reviews"] .reviews > article + article {

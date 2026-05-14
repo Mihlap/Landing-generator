@@ -1,4 +1,5 @@
 import type { ImagePreference } from "./landingHtmlPostprocessTypes.js";
+import { resolveImageProvider, toPollinationsImageUrl } from "./imageGen.js";
 
 function preferParam(pref: ImagePreference | undefined): "stock" | "gen" | undefined {
   if (pref === "stock_first") return "gen";
@@ -92,6 +93,61 @@ export function appendLandingSidToLocalImages(html: string, seed: number): strin
     sp.set("sid", String(sid));
     return `${pre}${q}${path.slice(0, qi)}?${sp.toString()}${q2}`;
   });
+}
+
+function parseLocalImagePath(path: string): {
+  prompt: string;
+  width: number;
+  height: number;
+  variation: number;
+  landingSid: number;
+} | null {
+  try {
+    const parsed = new URL(path, "http://localhost");
+    const prompt =
+      (parsed.searchParams.get("prompt") || "").trim() || "website section illustration";
+    const w = Number(parsed.searchParams.get("w"));
+    const h = Number(parsed.searchParams.get("h"));
+    const vRaw = Number(parsed.searchParams.get("v"));
+    const variation =
+      Number.isFinite(vRaw) && vRaw >= 0 ? Math.min(999, Math.floor(vRaw)) : 0;
+    const sidRaw = parsed.searchParams.get("sid");
+    const landingSid =
+      sidRaw && /^\d{1,15}$/.test(sidRaw.trim()) ? (Number(sidRaw.trim()) >>> 0) : 0;
+    const width = Number.isFinite(w) ? w : 1024;
+    const height = Number.isFinite(h) ? h : 768;
+    return { prompt, width, height, variation, landingSid };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Для провайдера pollinations подставляет прямой URL image.pollinations.ai вместо /image?,
+ * чтобы «Копировать адрес изображения» открывался в новой вкладке без вашего API.
+ * Для doubao/off не трогаем — иначе ссылка не совпадала бы с прокси /image.
+ */
+export function expandLocalImageUrlsToDirectPollinations(html: string): string {
+  if (resolveImageProvider() !== "pollinations") return html;
+
+  const toDirect = (path: string): string | null => {
+    const p = parseLocalImagePath(path);
+    if (!p) return null;
+    return toPollinationsImageUrl(p.prompt, { width: p.width, height: p.height }, p.variation, p.landingSid);
+  };
+
+  let out = html.replace(/(\ssrc\s*=\s*)(["'])(\/image\?[^"']*)(\2)/gi, (full, pre, q, path: string, q2) => {
+    const direct = toDirect(path);
+    return direct ? `${pre}${q}${direct}${q2}` : full;
+  });
+
+  out = out.replace(/url\(\s*(["']?)(\/image\?[^"')]+)\1\s*\)/gi, (full, _q: string, path: string) => {
+    const direct = toDirect(path);
+    if (!direct) return full;
+    return `url("${direct}")`;
+  });
+
+  return out;
 }
 
 export function replaceStockImagesWithAi(html: string, imagePreference?: ImagePreference): string {

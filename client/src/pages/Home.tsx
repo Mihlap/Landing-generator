@@ -169,6 +169,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const generateAbortRef = useRef<AbortController | null>(null);
+  /** true только пока ждём ответ /generate; при успехе сбрасываем до navigate, чтобы уход в редактор не давал ложного abort в cleanup */
+  const generatePendingRef = useRef(false);
 
   const closeExpandedPrompt = useCallback(() => setPromptExpanded(false), []);
   const openExpandedPrompt = useCallback(() => setPromptExpanded(true), []);
@@ -217,8 +219,11 @@ export default function Home() {
 
   useEffect(
     () => () => {
-      generateAbortRef.current?.abort();
+      if (generatePendingRef.current) {
+        generateAbortRef.current?.abort();
+      }
       generateAbortRef.current = null;
+      generatePendingRef.current = false;
     },
     [],
   );
@@ -230,13 +235,16 @@ export default function Home() {
     generateAbortRef.current?.abort();
     const controller = new AbortController();
     generateAbortRef.current = controller;
+    generatePendingRef.current = true;
     try {
       const data = await postGenerate(prompt.trim(), siteLocale, { generateMode, signal: controller.signal });
+      generatePendingRef.current = false;
       navigate("/editor", { state: { data } });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Не удалось создать");
     } finally {
+      generatePendingRef.current = false;
       if (generateAbortRef.current === controller) {
         generateAbortRef.current = null;
       }

@@ -68,18 +68,38 @@ describe("enhanceLandingHtml", () => {
   });
 
   it("разводит одинаковые /image? по слотам v=1, v=2…", () => {
-    const html = `<!DOCTYPE html><html><head></head><body>
+    vi.stubEnv("IMAGE_PROVIDER", "doubao");
+    try {
+      const html = `<!DOCTYPE html><html><head></head><body>
 <img src="/image?prompt=one&w=1024&h=768" alt="a">
 <img src="/image?prompt=one&w=1024&h=768" alt="b">
 <img src="/image?prompt=one&w=1024&h=768" alt="c">
 </body></html>`;
-    const out = enhanceLandingHtml(html, undefined, { skipVisualEnrichment: true });
-    const srcMatches = [...out.matchAll(/\ssrc="(\/image\?[^"]+)"/g)].map((m) => m[1]);
-    expect(srcMatches.length).toBeGreaterThanOrEqual(3);
-    expect(srcMatches.filter((s) => !/[?&]v=\d+/.test(s)).length).toBe(1);
-    expect(srcMatches.some((s) => s.includes("v=1"))).toBe(true);
-    expect(srcMatches.some((s) => s.includes("v=2"))).toBe(true);
-    expect(srcMatches.every((s) => /[?&]sid=\d+/.test(s))).toBe(true);
+      const out = enhanceLandingHtml(html, undefined, { skipVisualEnrichment: true });
+      const srcMatches = [...out.matchAll(/\ssrc="(\/image\?[^"]+)"/g)].map((m) => m[1]);
+      expect(srcMatches.length).toBeGreaterThanOrEqual(3);
+      expect(srcMatches.filter((s) => !/[?&]v=\d+/.test(s)).length).toBe(1);
+      expect(srcMatches.some((s) => s.includes("v=1"))).toBe(true);
+      expect(srcMatches.some((s) => s.includes("v=2"))).toBe(true);
+      expect(srcMatches.every((s) => /[?&]sid=\d+/.test(s))).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("при pollinations подставляет прямой URL в img и в CSS url()", () => {
+    vi.stubEnv("IMAGE_PROVIDER", "pollinations");
+    try {
+      const html = `<!DOCTYPE html><html><head><style>.hero{background:url('/image?prompt=bg+test&w=1200&h=800') center/cover}</style></head><body>
+<img src="/image?prompt=gallery+shot&w=640&h=480" alt=""></body></html>`;
+      const out = enhanceLandingHtml(html, undefined, { skipVisualEnrichment: true });
+      expect(out).toMatch(/src="https:\/\/image\.pollinations\.ai\/prompt\//);
+      expect(out).toMatch(/url\("https:\/\/image\.pollinations\.ai\/prompt\//);
+      expect(out).not.toContain('src="/image?');
+      expect(out).not.toContain("url('/image?");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("переписывает внутренние ссылки в якоря текущей страницы", () => {
@@ -163,7 +183,7 @@ describe("enhanceLandingHtml", () => {
     `;
     const out = enhanceLandingHtml(html);
     expect(out).not.toMatch(/<img[^>]*src="data:image/i);
-    expect(out).toContain("/image?prompt=");
+    expect(out).toMatch(/https:\/\/image\.pollinations\.ai\/prompt\//);
   });
 
   it("заменяет пустые background-image url() на fallback", () => {
@@ -190,14 +210,16 @@ describe("enhanceLandingHtml", () => {
     const html = "<html><body><header><h1>x</h1></header><main><section>content</section></main></body></html>";
     const out = enhanceLandingHtml(html);
     expect(out).toContain("data-landing-hero-image");
-    expect(out).toMatch(/\/image\?prompt=/);
+    expect(out).toMatch(/https:\/\/image\.pollinations\.ai\/prompt\/|\/image\?prompt=/);
   });
 
   it("добавляет блок визуалов если картинок меньше трёх", () => {
     const html = "<html><body><main><section>content</section></main></body></html>";
     const out = enhanceLandingHtml(html);
     expect(out).toContain('data-landing-visuals="1"');
-    expect((out.match(/\/image\?prompt=/g) || []).length).toBeGreaterThanOrEqual(3);
+    const n = (out.match(/https:\/\/image\.pollinations\.ai\/prompt\//g) || []).length;
+    const m = (out.match(/\/image\?prompt=/g) || []).length;
+    expect(n + m).toBeGreaterThanOrEqual(3);
   });
 
   it("добавляет сетку отступов для секции с class='review' и review-grid", () => {
@@ -262,7 +284,7 @@ describe("enhanceLandingHtml", () => {
   it("всегда переписывает внешние stock-изображения в локальный AI endpoint", () => {
     const html = `<!DOCTYPE html><html><head><title>T</title></head><body><img src="https://images.unsplash.com/photo-1?w=100" alt="rose"></body></html>`;
     const out = enhanceLandingHtml(html);
-    expect(out).toMatch(/\/image\?/);
+    expect(out).toMatch(/https:\/\/image\.pollinations\.ai\/prompt\/|\/image\?/);
     expect(out).not.toContain("images.unsplash.com");
   });
 

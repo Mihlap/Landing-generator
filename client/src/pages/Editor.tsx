@@ -41,17 +41,28 @@ export default function Editor() {
   const [exportLoading, setExportLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
   const loadPreview = useCallback(async () => {
     if (!data) return;
+    previewAbortRef.current?.abort();
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
     setLoadError(null);
     try {
-      const h = await postPreviewHtml(data);
+      const h = await postPreviewHtml(data, { signal: controller.signal });
+      if (previewAbortRef.current !== controller) return;
       setHtml(h);
       setDraftHtml(h);
       touchEditorPromoAnchor();
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (previewAbortRef.current !== controller) return;
       setLoadError(e instanceof Error ? e.message : "Ошибка предпросмотра");
+    } finally {
+      if (previewAbortRef.current === controller) {
+        previewAbortRef.current = null;
+      }
     }
   }, [data]);
 
@@ -67,8 +78,13 @@ export default function Editor() {
     touchEditorPromoAnchor();
   }, []);
 
-  if (!data) return null;
-  const landingData = data;
+  useEffect(
+    () => () => {
+      previewAbortRef.current?.abort();
+      previewAbortRef.current = null;
+    },
+    [],
+  );
 
   const previewHtml = draftHtml || html;
   const previewSrcDoc = useMemo(() => ensurePreviewBaseHref(previewHtml), [previewHtml]);
@@ -85,11 +101,12 @@ export default function Editor() {
     setPreviewLoading(true);
   }, [editing, previewHtml]);
 
-  async function downloadHtml() {
+  const downloadHtml = useCallback(async () => {
+    if (!data) return;
     setExportError(null);
     setExportLoading(true);
     try {
-      const blob = await postExportHtml(landingData);
+      const blob = await postExportHtml(data);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -103,9 +120,9 @@ export default function Editor() {
     } finally {
       setExportLoading(false);
     }
-  }
+  }, [data]);
 
-  function downloadHtmlLegacyFallback() {
+  const downloadHtmlLegacyFallback = useCallback(() => {
     const source = (draftHtml || html).trim();
     if (!source) return;
     const blob = new Blob([source], { type: "text/html;charset=utf-8" });
@@ -115,7 +132,7 @@ export default function Editor() {
     a.download = "landing.html";
     a.click();
     URL.revokeObjectURL(url);
-  }
+  }, [draftHtml, html]);
 
   const finishPreviewLoading = useCallback(() => {
     setPreviewLoading(false);
@@ -128,12 +145,17 @@ export default function Editor() {
   }, [finishPreviewLoading]);
 
   const handleBack = useCallback(() => {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
     if (iframeRef.current) {
       iframeRef.current.srcdoc = "";
       iframeRef.current.src = "about:blank";
     }
     navigate("/", { state: LOCATION_FROM_EDITOR });
   }, [navigate]);
+
+  if (!data) return null;
+  const landingData = data;
 
   return (
     <div className="min-h-screen flex flex-col">

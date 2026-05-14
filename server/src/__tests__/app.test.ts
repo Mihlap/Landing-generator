@@ -203,6 +203,23 @@ describe("HTTP API", () => {
         .send({ data: validLandingData })
         .expect(200);
     });
+
+    it("при недоступности внешнего изображения сохраняет src /image? вместо data URI", async () => {
+      vi.stubGlobal("fetch", () => Promise.reject(new Error("network")));
+      try {
+        const generatedHtml =
+          '<!DOCTYPE html><html><body><img src="/image?prompt=testexport&w=512&h=384" alt="x"></body></html>';
+        const res = await request(app)
+          .post("/export")
+          .set("x-export-paid", "true")
+          .send({ data: { ...validLandingData, generatedHtml }, paid: true })
+          .expect(200);
+        expect(res.text).toContain("/image?prompt=testexport");
+        expect(res.text).not.toContain("AI%20preview%20image");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
   });
 
   describe("тело не JSON", () => {

@@ -100,6 +100,18 @@ describe("postPreviewHtml", () => {
     );
     await expect(postPreviewHtml({} as LandingData)).rejects.toThrow("invalid data payload");
   });
+
+  it("передаёт signal в fetch", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("<html>", { status: 200 }));
+    const ac = new AbortController();
+    await postPreviewHtml(sample, { signal: ac.signal });
+    expect(fetch).toHaveBeenCalledWith(
+      "/preview",
+      expect.objectContaining({
+        signal: ac.signal,
+      }),
+    );
+  });
 });
 
 describe("postExportHtml", () => {

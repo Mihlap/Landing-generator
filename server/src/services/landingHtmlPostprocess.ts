@@ -29,6 +29,7 @@ import {
   appendLandingSidToLocalImages,
   assignVariationSlotsToLocalImages,
   computeLandingImageSeed,
+  expandLocalImageUrlsToDirectPollinations,
   FALLBACK_IMAGE_SRC,
   replaceStockImagesWithAi,
 } from "./landingHtmlPostprocessImageUrl.js";
@@ -95,7 +96,8 @@ export function enhanceLandingHtml(
   const withVisualCoverage = skipVisual ? withAiImages : ensureVisualCoverage(withAiImages, imagePreference);
   const withImageSlots = assignVariationSlotsToLocalImages(withVisualCoverage);
   const withLandingSid = appendLandingSidToLocalImages(withImageSlots, landingSeed);
-  const withLeadForm = ensureLeadForm(withLandingSid);
+  const withDirectImageUrls = expandLocalImageUrlsToDirectPollinations(withLandingSid);
+  const withLeadForm = ensureLeadForm(withDirectImageUrls);
   const normalizedLinks = rewriteInternalLinksToAnchors(withLeadForm);
   const trimmed = normalizedLinks.trim();
   if (!trimmed) return trimmed;
