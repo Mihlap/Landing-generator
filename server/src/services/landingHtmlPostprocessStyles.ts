@@ -428,6 +428,29 @@ section.benefits [class*="grid"] {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: clamp(1rem, 2vw, 1.5rem);
 }
+section.gallery {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+section.gallery .gallery-grid,
+section.gallery [class*="gallery-grid"],
+section.gallery [class*="cards"],
+section.gallery [class*="grid"] {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)) !important;
+  gap: clamp(1rem, 2vw, 1.75rem) !important;
+  row-gap: clamp(1rem, 2.2vw, 1.75rem) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  align-items: stretch !important;
+}
+section.gallery [class*="grid"] > * {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
 section.reviews,
 section.review,
 section[data-lp="reviews"] {
@@ -641,6 +664,9 @@ header[class*="hero" i] .hero-content {
   }
   section.benefits .benefits-grid,
   section.benefits [class*="benefits-grid"],
+  section.gallery .gallery-grid,
+  section.gallery [class*="gallery-grid"],
+  section.gallery [class*="grid"],
   section.reviews,
   section.review,
   section.reviews .reviews-grid,
