@@ -181,14 +181,26 @@ section[class*="map" i] {
   margin: 1rem auto 0;
   display: grid;
   gap: .9rem;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  align-items: stretch;
+  justify-items: stretch;
 }
-[data-landing-visuals="1"] img {
+/* иначе section > * + * даёт margin-top 2–3 img и «ломает» ряд по вертикали */
+section[data-landing-visuals="1"] > * + * {
+  margin-top: 0 !important;
+}
+[data-landing-visuals="1"] > img {
   width: 100%;
+  min-width: 0;
+  margin: 0;
   height: auto;
   aspect-ratio: 16 / 9;
   object-fit: cover;
+  object-position: center;
   border-radius: 12px;
+  display: block;
+  align-self: stretch;
+  justify-self: stretch;
 }
 section.gallery img,
 section[class*="gallery" i] img {
@@ -409,6 +421,40 @@ section.review > h2,
 section[data-lp="reviews"] > h2 {
   text-align: center;
   margin-bottom: clamp(0.75rem, 2vw, 1.2rem);
+}
+section.cta > h1,
+section.cta > h2,
+section.cta > h3,
+[data-lp="cta"] > h1,
+[data-lp="cta"] > h2,
+[data-lp="cta"] > h3,
+[data-lp="contact"] > h1:first-of-type,
+[data-lp="contact"] > h2:first-of-type,
+[data-lp="contact"] > h3:first-of-type,
+section:has(> [class*="cta-form" i]) > h1:first-of-type,
+section:has(> [class*="cta-form" i]) > h2:first-of-type,
+section:has(> [class*="cta-form" i]) > h3:first-of-type,
+section:has(> [class*="contact-form" i]) > h1:first-of-type,
+section:has(> [class*="contact-form" i]) > h2:first-of-type,
+section:has(> [class*="contact-form" i]) > h3:first-of-type,
+section:has(> [class*="booking-form" i]) > h1:first-of-type,
+section:has(> [class*="booking-form" i]) > h2:first-of-type,
+section:has(> [class*="booking-form" i]) > h3:first-of-type,
+section:has(> [class*="signup-form" i]) > h1:first-of-type,
+section:has(> [class*="signup-form" i]) > h2:first-of-type,
+section:has(> [class*="signup-form" i]) > h3:first-of-type,
+section:has(> form:not([role="search"]):not([class*="search" i])) > h1:first-of-type,
+section:has(> form:not([role="search"]):not([class*="search" i])) > h2:first-of-type,
+section:has(> form:not([role="search"]):not([class*="search" i])) > h3:first-of-type,
+section:has(> .form:not([class*="platform" i])) > h1:first-of-type,
+section:has(> .form:not([class*="platform" i])) > h2:first-of-type,
+section:has(> .form:not([class*="platform" i])) > h3:first-of-type {
+  text-align: center !important;
+  width: 100%;
+  max-width: min(40rem, 100%);
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box;
 }
 section.benefits {
   display: grid;
@@ -657,8 +703,13 @@ header[class*="hero" i] .hero-content {
   width: min(100%, ${LANDING_CONTENT_WIDTH});
   margin: 1.25rem auto 0;
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(1rem, 2vw, 1.75rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  align-items: stretch;
+  justify-items: stretch;
+}
+section[data-landing-visuals="1"] > * + * {
+  margin-top: 0 !important;
 }
 @media (max-width: 1024px) {
   section {
@@ -695,6 +746,9 @@ header[class*="hero" i] .hero-content {
   section[data-lp="reviews"] [class*="review-grid"] {
     grid-template-columns: 1fr;
   }
+  [data-landing-visuals="1"] {
+    grid-template-columns: 1fr !important;
+  }
   [data-landing-title-fix="1"],
   header[class*="hero" i],
   section[class*="hero" i],
@@ -702,12 +756,18 @@ header[class*="hero" i] .hero-content {
     flex-direction: column;
   }
 }
-[data-landing-visuals="1"] img {
+[data-landing-visuals="1"] > img {
   width: 100%;
+  min-width: 0;
+  margin: 0;
   height: auto;
   aspect-ratio: 16 / 9;
   object-fit: cover;
+  object-position: center;
   border-radius: 12px;
+  display: block;
+  align-self: stretch;
+  justify-self: stretch;
 }
 </style>`;
 export const LEAD_FORM_STYLE = `<style ${LEAD_FORM_MARKER}="1">

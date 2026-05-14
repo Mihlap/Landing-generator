@@ -17,6 +17,22 @@ function ensurePreviewBaseHref(html: string): string {
   return `<!DOCTYPE html><html><head>${tag}</head><body>${html}</body></html>`;
 }
 
+/** В iframe + srcdoc отложенный loading="lazy" часто не стартует до перерисовки; снимаем lazy и при необходимости перезапускаем src. */
+function kickIframeLazyImages(doc: Document): void {
+  doc.querySelectorAll('img[loading="lazy"]').forEach((node) => {
+    const img = node;
+    if (!(img instanceof HTMLImageElement)) return;
+    const src = img.getAttribute("src");
+    if (!src?.trim()) return;
+    img.removeAttribute("loading");
+    if (!img.complete || img.naturalWidth === 0) {
+      img.removeAttribute("src");
+      void img.offsetWidth;
+      img.setAttribute("src", src);
+    }
+  });
+}
+
 function normalizeData(raw: LandingData | undefined): LandingData | undefined {
   if (!raw) return undefined;
   return {
@@ -139,8 +155,20 @@ export default function Editor() {
   }, []);
 
   const handlePreviewLoad = useCallback(() => {
+    const kick = () => {
+      try {
+        const doc = iframeRef.current?.contentDocument;
+        if (doc?.body) kickIframeLazyImages(doc);
+      } catch {
+        /* srcdoc обычно same-origin; на всякий случай игнорируем */
+      }
+    };
     window.requestAnimationFrame(() => {
-      finishPreviewLoading();
+      window.requestAnimationFrame(() => {
+        kick();
+        window.setTimeout(kick, 150);
+        finishPreviewLoading();
+      });
     });
   }, [finishPreviewLoading]);
 
